@@ -5,17 +5,19 @@ from flask_socketio import SocketIO, emit
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
+
+# Uses PostgreSQL on Render, or SQLite locally
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///chat.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10000000) # Support for larger audio files
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
-    content = db.Column(db.String(500), nullable=False)
-    # NEW: Stores the time the message was sent
+    content = db.Column(db.Text, nullable=False) # Text type for long audio strings
     timestamp = db.Column(db.String(10), default=lambda: datetime.now().strftime("%H:%M"))
+    is_audio = db.Column(db.Boolean, default=False)
 
 with app.app_context():
     db.create_all()
@@ -32,30 +34,30 @@ def handle_connect():
     connected_users += 1
     emit('user_count', {'count': connected_users}, broadcast=True)
     
-    messages = Message.query.all()
+    messages = Message.query.order_by(Message.id.asc()).all()
     for msg in messages:
-        emit('message', {'username': msg.username, 'message': msg.content, 'time': msg.timestamp})
+        emit('message', {
+            'username': msg.username, 
+            'message': msg.content, 
+            'time': msg.timestamp,
+            'is_audio': msg.is_audio
+        })
 
 @socketio.on('message')
 def handle_message(data):
-    # ADMIN COMMAND: Type "/clear" to wipe the database
-    if data['message'] == "/clear":
+    if data.get('message') == "/clear":
         Message.query.delete()
         db.session.commit()
         emit('reload', broadcast=True)
         return
 
-    new_msg = Message(username=data['username'], content=data['message'])
+    is_audio = data.get('is_audio', False)
+    new_msg = Message(username=data['username'], content=data['message'], is_audio=is_audio)
     db.session.add(new_msg)
     db.session.commit()
     
-    # Send message with the current time
     data['time'] = datetime.now().strftime("%H:%M")
     emit('message', data, broadcast=True)
-
-@socketio.on('typing')
-def handle_typing(data):
-    emit('display_typing', data, broadcast=True, include_self=False)
 
 @socketio.on('disconnect')
 def handle_disconnect():

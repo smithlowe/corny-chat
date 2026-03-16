@@ -17,13 +17,15 @@
         .bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
         .mine { background: #dcf8c6; border-bottom-right-radius: 2px; }
         .others { background: #fff; border-bottom-left-radius: 2px; }
-        .shared-img { width: 100%; border-radius: 8px; margin-top: 5px; display: block; cursor: pointer; }
+        .shared-img { width: 100%; border-radius: 8px; margin-top: 5px; cursor: pointer; }
         .time { font-size: 9px; color: #888; float: right; margin-top: 5px; margin-left: 8px; }
-        #typing-box { font-size: 12px; color: #555; padding: 5px 15px; background: #f0f0f0; min-height: 22px; }
-        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
+        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 8px; align-items: center; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
-        button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 20px; }
-        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        button { background: #075e54; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .recording { background: #ff3b30 !important; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        audio { max-width: 100%; height: 35px; margin-top: 5px; }
+        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
@@ -32,35 +34,29 @@
         <h1 style="color:#075e54">🌍 Global Social</h1>
         <div id="avatar-preview" style="margin-bottom:15px"></div>
         <input type="text" id="name-in" placeholder="Nickname..." oninput="updatePreview()" style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px; text-align:center;">
-        <button onclick="start()" style="width: 80%; border-radius: 25px;">Join Chat</button>
+        <button onclick="start()" style="width: 80%; border-radius: 25px; height: 45px;">Join Chat</button>
     </div>
-
-    <header>
-        <span>Global Social</span>
-        <span id="count">Online: 0</span>
-    </header>
-
+    <header><span>Global Social</span><span id="count">Online: 0</span></header>
     <div id="chat-window"></div>
-    <div id="typing-box"></div>
-
     <div class="input-bar">
-        <input type="text" id="msg-in" placeholder="Message or Image Link..." onkeypress="if(event.key==='Enter')send()">
+        <input type="text" id="msg-in" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
+        <button id="mic-btn" onclick="toggleRecording()">🎙️</button>
         <button onclick="send()">➤</button>
     </div>
 </div>
-
 <audio id="ping-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
 
 <script>
     const socket = io();
     let myName = localStorage.getItem('chat_name') || "";
-    const getAvatar = (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`;
+    let mediaRecorder;
+    let audioChunks = [];
 
+    const getAvatar = (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`;
     function updatePreview() {
         const name = document.getElementById('name-in').value;
         if(name) document.getElementById('avatar-preview').innerHTML = `<img src="${getAvatar(name)}" style="width:80px; height:80px; border-radius:50%">`;
     }
-
     if (myName) document.getElementById('overlay').style.display = 'none';
 
     function start() {
@@ -68,36 +64,49 @@
         if (val) { myName = val; localStorage.setItem('chat_name', val); location.reload(); }
     }
 
-    // NEW: Function to check if a message is an image link
     function formatMessage(text) {
         const urlPattern = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp))/i;
-        if (urlPattern.test(text)) {
-            return `<img src="${text}" class="shared-img" onclick="window.open('${text}')">`;
+        return urlPattern.test(text) ? `<img src="${text}" class="shared-img" onclick="window.open('${text}')">` : text;
+    }
+
+    async function toggleRecording() {
+        const btn = document.getElementById('mic-btn');
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = () => socket.emit('message', {username: myName, message: reader.result, is_audio: true});
+            };
+            mediaRecorder.start();
+            btn.classList.add('recording');
+        } else {
+            mediaRecorder.stop();
+            btn.classList.remove('recording');
         }
-        return text;
     }
 
     function send() {
         const el = document.getElementById('msg-in');
-        if (el.value.trim()) { 
-            socket.emit('message', {username: myName, message: el.value}); 
-            el.value = ''; 
-        }
+        if (el.value.trim()) { socket.emit('message', {username: myName, message: el.value, is_audio: false}); el.value = ''; }
     }
 
     socket.on('message', d => {
         const win = document.getElementById('chat-window');
         const isMe = d.username === myName;
-        
-        // Play sound if message is from someone else
-        if (!isMe) document.getElementById('ping-sound').play().catch(() => {});
+        if (!isMe) document.getElementById('ping-sound').play().catch(()=>{});
 
+        let content = d.is_audio ? `<audio controls src="${d.message}"></audio>` : formatMessage(d.message);
         win.innerHTML += `
             <div class="msg-container ${isMe ? 'mine-container' : ''}">
                 <img src="${getAvatar(d.username)}" class="avatar">
                 <div class="bubble ${isMe ? 'mine' : 'others'}">
                     ${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}
-                    ${formatMessage(d.message)}
+                    ${content}
                     <span class="time">${d.time || ''}</span>
                 </div>
             </div>`;
