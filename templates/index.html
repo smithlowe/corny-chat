@@ -6,17 +6,28 @@
     <title>Global Social</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        #app-container { background: white; width: 95%; max-width: 450px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 25px; text-align: center; }
-        #status-bar { background: #e3f2fd; padding: 6px 15px; border-radius: 20px; display: inline-block; font-size: 13px; color: #007bff; margin-bottom: 15px; font-weight: bold; }
-        #chat-container { display: none; }
-        #messages { height: 350px; overflow-y: auto; border: 1px solid #f0f0f0; padding: 15px; margin-bottom: 5px; border-radius: 12px; background: #fafafa; text-align: left; }
-        #typing-indicator { height: 20px; font-size: 12px; color: #888; font-style: italic; text-align: left; padding-left: 5px; margin-bottom: 10px; }
-        .input-area { display: flex; gap: 10px; }
-        input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
-        button { padding: 10px 20px; background-color: #0084ff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .logout-btn { background: none; color: #ff4b4b; border: none; font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 15px; }
-        p { margin: 5px 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #e5ddd5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        #app-container { background: white; width: 95%; max-width: 450px; height: 90vh; border-radius: 15px; display: flex; flexDirection: column; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        /* Join Screen */
+        #join-container { padding: 40px; text-align: center; margin: auto; }
+        
+        /* Chat Header */
+        #chat-header { background: #075e54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        #chat-container { display: none; flex-direction: column; height: 100%; width: 100%; }
+        
+        /* Message Bubbles */
+        #messages { flex-grow: 1; overflow-y: auto; padding: 20px; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); }
+        .message-row { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .bubble { max-width: 80%; padding: 10px 15px; border-radius: 15px; font-size: 14px; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .others { background: white; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .mine { background: #dcf8c6; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .user-label { font-size: 10px; font-weight: bold; color: #075e54; margin-bottom: 3px; }
+
+        #typing-indicator { padding: 5px 20px; font-size: 12px; color: #666; background: rgba(255,255,255,0.8); }
+        .input-area { padding: 15px; background: #f0f0f0; display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 12px; border: none; border-radius: 25px; outline: none; }
+        button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -24,21 +35,22 @@
 <div id="app-container">
     <div id="join-container">
         <h1>🌍 Global Social</h1>
-        <p>Connect with anyone, anywhere.</p>
-        <input type="text" id="nickname-input" placeholder="Enter your nickname...">
-        <br>
-        <button onclick="joinWorld()">Start Chatting</button>
+        <input type="text" id="nickname-input" placeholder="What's your name?">
+        <br><br>
+        <button style="width: 150px; border-radius: 10px;" onclick="joinWorld()">Join World</button>
     </div>
 
     <div id="chat-container">
-        <div id="status-bar">🟢 Online: <span id="online-count">1</span></div>
+        <div id="chat-header">
+            <span>🌍 Global Social</span>
+            <span id="online-count" style="font-size: 12px;">Online: 1</span>
+        </div>
         <div id="messages"></div>
         <div id="typing-indicator"></div>
         <div class="input-area">
             <input type="text" id="message-input" placeholder="Type a message..." oninput="notifyTyping()">
-            <button onclick="sendMessage()">Send</button>
+            <button onclick="sendMessage()">></button>
         </div>
-        <button class="logout-btn" onclick="logout()">Logout / Change Name</button>
     </div>
 </div>
 
@@ -47,7 +59,6 @@
     let currentUser = "";
     let typingTimeout;
 
-    // Check for saved name on startup
     document.addEventListener('DOMContentLoaded', () => {
         const savedName = localStorage.getItem('chat_nickname');
         if (savedName) autoJoin(savedName);
@@ -56,7 +67,7 @@
     function autoJoin(name) {
         currentUser = name;
         document.getElementById('join-container').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'block';
+        document.getElementById('chat-container').style.display = 'flex';
     }
 
     function joinWorld() {
@@ -85,12 +96,22 @@
     }
 
     socket.on('user_count', (data) => {
-        document.getElementById('online-count').innerText = data.count;
+        document.getElementById('online-count').innerText = "Online: " + data.count;
     });
 
     socket.on('message', (data) => {
         const msgDiv = document.getElementById('messages');
-        msgDiv.innerHTML += `<p><strong>${data.username}:</strong> ${data.message}</p>`;
+        const isMine = data.username === currentUser;
+        
+        const html = `
+            <div class="message-row">
+                <div class="bubble ${isMine ? 'mine' : 'others'}">
+                    ${!isMine ? `<div class="user-label">${data.username}</div>` : ''}
+                    ${data.message}
+                </div>
+            </div>
+        `;
+        msgDiv.innerHTML += html;
         msgDiv.scrollTop = msgDiv.scrollHeight;
     });
 
@@ -98,11 +119,6 @@
         const indicator = document.getElementById('typing-indicator');
         indicator.innerText = data.isTyping ? `${data.username} is typing...` : "";
     });
-
-    function logout() {
-        localStorage.removeItem('chat_nickname');
-        location.reload();
-    }
 </script>
 
 </body>
