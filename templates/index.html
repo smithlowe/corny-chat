@@ -9,18 +9,35 @@
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #d1d7db; margin: 0; display: flex; justify-content: center; height: 100vh; }
         #app-container { width: 100%; max-width: 450px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; }
-        header { background: #075e54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        /* Header */
+        header { background: #075e54; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 5; }
+        
+        /* Chat Area */
         #chat-window { flex: 1; background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); overflow-y: auto; padding: 15px; scroll-behavior: smooth; }
-        .msg-container { margin-bottom: 10px; display: flex; flex-direction: column; }
-        .bubble { max-width: 85%; padding: 8px 12px; border-radius: 8px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
-        .mine { align-self: flex-end; background: #dcf8c6; border-top-right-radius: 0; }
-        .others { align-self: flex-start; background: #fff; border-top-left-radius: 0; }
+        
+        /* Message Layout */
+        .msg-container { margin-bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
+        .mine-container { flex-direction: row-reverse; }
+        
+        /* Avatar Circle */
+        .avatar { width: 35px; height: 35px; border-radius: 50%; background: #eee; border: 1px solid #ddd; }
+        
+        /* Bubbles */
+        .bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
+        .mine { background: #dcf8c6; border-bottom-right-radius: 2px; }
+        .others { background: #fff; border-bottom-left-radius: 2px; }
+        
         .user-tag { font-size: 11px; font-weight: bold; color: #075e54; display: block; margin-bottom: 2px; }
         .time { font-size: 9px; color: #888; float: right; margin-top: 5px; margin-left: 8px; }
+
+        /* Input Area */
         #typing-box { font-size: 12px; color: #555; padding: 5px 15px; background: #f0f0f0; min-height: 22px; }
         .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
-        button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 20px; }
+
+        /* Welcome Screen */
         #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
     </style>
 </head>
@@ -28,26 +45,56 @@
 <div id="app-container">
     <div id="overlay">
         <h1 style="color:#075e54">🌍 Global Social</h1>
-        <p>Mukono's Live Connection</p>
-        <input type="text" id="name-in" placeholder="Nickname..." style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px;">
+        <p>Your identity in Mukono</p>
+        <div id="avatar-preview" style="margin-bottom:15px"></div>
+        <input type="text" id="name-in" placeholder="Enter Nickname..." oninput="updatePreview()" style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px; text-align:center;">
         <button onclick="start()" style="width: 80%; border-radius: 25px;">Join Chat</button>
     </div>
-    <header><span>Global Social</span><span id="count">Online: 0</span></header>
+
+    <header>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <img id="my-mini-avatar" src="" class="avatar" style="display:none; width:30px; height:30px;">
+            <span>Global Social</span>
+        </div>
+        <span id="count">Online: 0</span>
+    </header>
+
     <div id="chat-window"></div>
     <div id="typing-box"></div>
+
     <div class="input-bar">
         <input type="text" id="msg-in" placeholder="Message..." oninput="isTyping()" onkeypress="if(event.key==='Enter')send()">
         <button onclick="send()">➤</button>
     </div>
 </div>
+
 <script>
     const socket = io();
     let myName = localStorage.getItem('chat_name') || "";
-    if (myName) document.getElementById('overlay').style.display = 'none';
+    
+    // Function to get an Avatar URL based on a name
+    const getAvatar = (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`;
+
+    function updatePreview() {
+        const name = document.getElementById('name-in').value;
+        if(name) {
+            document.getElementById('avatar-preview').innerHTML = `<img src="${getAvatar(name)}" class="avatar" style="width:80px; height:80px;">`;
+        }
+    }
+
+    if (myName) {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('my-mini-avatar').src = getAvatar(myName);
+        document.getElementById('my-mini-avatar').style.display = 'block';
+    }
 
     function start() {
         const val = document.getElementById('name-in').value;
-        if (val) { myName = val; localStorage.setItem('chat_name', val); document.getElementById('overlay').style.display = 'none'; }
+        if (val) { 
+            myName = val; 
+            localStorage.setItem('chat_name', val); 
+            location.reload(); 
+        }
     }
     
     function send() {
@@ -70,20 +117,21 @@
     socket.on('message', d => {
         const win = document.getElementById('chat-window');
         const isMe = d.username === myName;
+        
         win.innerHTML += `
-            <div class="msg-container">
+            <div class="msg-container ${isMe ? 'mine-container' : ''}">
+                <img src="${getAvatar(d.username)}" class="avatar">
                 <div class="bubble ${isMe ? 'mine' : 'others'}">
                     ${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}
                     ${d.message}
                     <span class="time">${d.time || ''}</span>
                 </div>
             </div>`;
-        win.scrollTop = win.scrollHeight; // AUTO-SCROLL
+        win.scrollTop = win.scrollHeight;
     });
 
     socket.on('display_typing', d => document.getElementById('typing-box').innerText = d.status ? d.username + " is typing..." : "");
-    
-    socket.on('reload', () => location.reload()); // For the /clear command
+    socket.on('reload', () => location.reload());
 </script>
 </body>
 </html>
