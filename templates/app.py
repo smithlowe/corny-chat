@@ -35,7 +35,6 @@ def handle_connect():
     global connected_users
     connected_users += 1
     emit('user_count', {'count': connected_users}, broadcast=True)
-    # Load history
     messages = Message.query.order_by(Message.id.asc()).all()
     for msg in messages:
         emit('message', {
@@ -63,7 +62,6 @@ def handle_message(data):
     data['time'] = datetime.now().strftime("%H:%M")
     emit('message', data, broadcast=True)
 
-# THE NEW VIBE LOGIC: Broadcasts theme to everyone
 @socketio.on('vibe_change')
 def handle_vibe(data):
     emit('vibe_update', data, broadcast=True)
