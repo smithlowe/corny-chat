@@ -2,49 +2,50 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Social Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Global Social HD</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #d1d7db; margin: 0; display: flex; justify-content: center; height: 100vh; }
-        #app-container { width: 100%; max-width: 450px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; }
-        header { background: #075e54; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 5; }
-        #chat-window { flex: 1; background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); overflow-y: auto; padding: 15px; scroll-behavior: smooth; }
-        .msg-container { margin-bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #e5ddd5; margin: 0; display: flex; justify-content: center; height: 100vh; }
+        #app-container { width: 100%; max-width: 500px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; box-shadow: 0 12px 28px rgba(0,0,0,0.1); }
+        header { background: #075e54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        #chat-window { flex: 1; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-color: #e5ddd5; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
+        .msg-container { margin-bottom: 10px; display: flex; align-items: flex-end; gap: 8px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .mine-container { flex-direction: row-reverse; }
-        .avatar { width: 35px; height: 35px; border-radius: 50%; background: #eee; }
-        .bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
-        .mine { background: #dcf8c6; border-bottom-right-radius: 2px; }
-        .others { background: #fff; border-bottom-left-radius: 2px; }
-        .shared-img { width: 100%; border-radius: 8px; margin-top: 5px; cursor: pointer; }
-        .time { font-size: 9px; color: #888; float: right; margin-top: 5px; margin-left: 8px; }
-        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 8px; align-items: center; }
-        input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
-        button { background: #075e54; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .recording { background: #ff3b30 !important; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        audio { max-width: 100%; height: 35px; margin-top: 5px; }
-        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 1px solid #ddd; }
+        .bubble { max-width: 80%; padding: 8px 12px; border-radius: 15px; font-size: 15px; position: relative; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+        .mine { background: #dcf8c6; border-bottom-right-radius: 2px; align-self: flex-end; }
+        .others { background: #ffffff; border-bottom-left-radius: 2px; align-self: flex-start; }
+        .user-tag { display: block; font-size: 11px; font-weight: bold; color: #128c7e; margin-bottom: 3px; }
+        .time { font-size: 10px; color: #999; display: block; text-align: right; margin-top: 4px; }
+        audio { height: 40px; width: 210px; margin: 5px 0; border-radius: 20px; outline: none; }
+        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 8px; align-items: center; border-top: 1px solid #ddd; }
+        input[type="text"] { flex: 1; padding: 12px 18px; border-radius: 25px; border: 1px solid #fff; outline: none; font-size: 15px; }
+        button { background: #075e54; color: white; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        button:active { transform: scale(0.9); }
+        .mic-btn.recording { background: #ff3b30; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); } }
+        #overlay { position: absolute; inset: 0; background: #fff; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 <div id="app-container">
     <div id="overlay">
-        <h1 style="color:#075e54">🌍 Global Social</h1>
-        <div id="avatar-preview" style="margin-bottom:15px"></div>
-        <input type="text" id="name-in" placeholder="Nickname..." oninput="updatePreview()" style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px; text-align:center;">
-        <button onclick="start()" style="width: 80%; border-radius: 25px; height: 45px;">Join Chat</button>
+        <h2 style="color:#075e54; margin-bottom: 20px;">🌍 Global Social</h2>
+        <div id="avatar-preview"></div>
+        <input type="text" id="name-in" placeholder="What's your name?" oninput="updatePreview()" style="width: 70%; padding: 12px; margin: 20px 0; border: 1px solid #ccc; border-radius: 25px; text-align: center;">
+        <button onclick="start()" style="width: 70%; border-radius: 25px;">Enter Chat</button>
     </div>
-    <header><span>Global Social</span><span id="count">Online: 0</span></header>
+    <header><span>Global Social</span><span id="count" style="font-size: 12px; opacity: 0.8;">Online: 0</span></header>
     <div id="chat-window"></div>
     <div class="input-bar">
-        <input type="text" id="msg-in" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
-        <button id="mic-btn" onclick="toggleRecording()">🎙️</button>
+        <input type="text" id="msg-in" placeholder="Type a message..." onkeypress="if(event.key==='Enter')send()">
+        <button id="mic-btn" class="mic-btn" onclick="toggleRecording()">🎙️</button>
         <button onclick="send()">➤</button>
     </div>
 </div>
-<audio id="ping-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
 
 <script>
     const socket = io();
@@ -55,35 +56,35 @@
     const getAvatar = (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`;
     function updatePreview() {
         const name = document.getElementById('name-in').value;
-        if(name) document.getElementById('avatar-preview').innerHTML = `<img src="${getAvatar(name)}" style="width:80px; height:80px; border-radius:50%">`;
+        if(name) document.getElementById('avatar-preview').innerHTML = `<img src="${getAvatar(name)}" class="avatar" style="width:80px; height:80px;">`;
     }
     if (myName) document.getElementById('overlay').style.display = 'none';
 
     function start() {
-        const val = document.getElementById('name-in').value;
+        const val = document.getElementById('name-in').value.trim();
         if (val) { myName = val; localStorage.setItem('chat_name', val); location.reload(); }
-    }
-
-    function formatMessage(text) {
-        const urlPattern = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp))/i;
-        return urlPattern.test(text) ? `<img src="${text}" class="shared-img" onclick="window.open('${text}')">` : text;
     }
 
     async function toggleRecording() {
         const btn = document.getElementById('mic-btn');
         if (!mediaRecorder || mediaRecorder.state === "inactive") {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const reader = new FileReader();
-                reader.readAsDataURL(audioBlob);
-                reader.onloadend = () => socket.emit('message', {username: myName, message: reader.result, is_audio: true});
-            };
-            mediaRecorder.start();
-            btn.classList.add('recording');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+                });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => socket.emit('message', {username: myName, message: reader.result, is_audio: true});
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                mediaRecorder.start();
+                btn.classList.add('recording');
+            } catch (err) { alert("Mic error: " + err); }
         } else {
             mediaRecorder.stop();
             btn.classList.remove('recording');
@@ -98,9 +99,8 @@
     socket.on('message', d => {
         const win = document.getElementById('chat-window');
         const isMe = d.username === myName;
-        if (!isMe) document.getElementById('ping-sound').play().catch(()=>{});
-
-        let content = d.is_audio ? `<audio controls src="${d.message}"></audio>` : formatMessage(d.message);
+        let content = d.is_audio ? `<audio controls src="${d.message}"></audio>` : d.message;
+        
         win.innerHTML += `
             <div class="msg-container ${isMe ? 'mine-container' : ''}">
                 <img src="${getAvatar(d.username)}" class="avatar">
