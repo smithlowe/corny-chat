@@ -11,7 +11,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# SocketIO setup with 10MB limit for high-quality audio
+# SocketIO setup with 10MB limit for high-quality audio and images
 socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10000000)
 
 class Message(db.Model):
@@ -20,6 +20,7 @@ class Message(db.Model):
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.String(10), default=lambda: datetime.now().strftime("%H:%M"))
     is_audio = db.Column(db.Boolean, default=False)
+    profile_pic = db.Column(db.Text, nullable=True)  # Stores the Base64 image string
 
 with app.app_context():
     db.create_all()
@@ -35,13 +36,15 @@ def handle_connect():
     global connected_users
     connected_users += 1
     emit('user_count', {'count': connected_users}, broadcast=True)
+    # Load history
     messages = Message.query.order_by(Message.id.asc()).all()
     for msg in messages:
         emit('message', {
             'username': msg.username, 
             'message': msg.content, 
             'time': msg.timestamp, 
-            'is_audio': msg.is_audio
+            'is_audio': msg.is_audio,
+            'profile_pic': msg.profile_pic
         })
 
 @socketio.on('message')
@@ -55,10 +58,12 @@ def handle_message(data):
     new_msg = Message(
         username=data['username'], 
         content=data['message'], 
-        is_audio=data.get('is_audio', False)
+        is_audio=data.get('is_audio', False),
+        profile_pic=data.get('profile_pic')
     )
     db.session.add(new_msg)
     db.session.commit()
+    
     data['time'] = datetime.now().strftime("%H:%M")
     emit('message', data, broadcast=True)
 

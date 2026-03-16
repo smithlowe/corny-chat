@@ -3,185 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Global Social | Shared Vibes</title>
+    <title>Global Social | Gallery & Vibes</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        * { box-sizing: border-box; transition: background 0.4s ease, color 0.4s ease; }
+        * { box-sizing: border-box; transition: background 0.3s ease; }
+        body { font-family: -apple-system, sans-serif; background: #e5ddd5; margin: 0; display: flex; justify-content: center; height: 100vh; height: -webkit-fill-available; overflow: hidden; }
         
-        /* Fixed height for mobile browsers to prevent cutoff */
-        body { 
-            font-family: -apple-system, sans-serif; 
-            background: #e5ddd5; 
-            margin: 0; 
-            display: flex; 
-            justify-content: center; 
-            height: 100vh; 
-            height: -webkit-fill-available;
-            overflow: hidden; 
-        }
-        
-        #app-container { 
-            width: 100%; 
-            max-width: 500px; 
-            height: 100%; 
-            background: #fff; 
-            display: flex; 
-            flex-direction: column; 
-            box-shadow: 0 12px 28px rgba(0,0,0,0.2); 
-            position: relative;
-            /* Pushes everything up slightly from the very bottom edge */
-            padding-bottom: env(safe-area-inset-bottom, 15px); 
-        }
+        #app-container { width: 100%; max-width: 500px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; padding-bottom: env(safe-area-inset-bottom, 10px); }
         
         header { background: #075e54; color: white; padding: 12px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
-        #chat-window { flex: 1; background-color: rgba(0,0,0,0.05); overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
-        
+        #chat-window { flex: 1; background-color: rgba(0,0,0,0.03); overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
+
         /* THEMES */
-        body.cyberpunk { background: #0b0e14; }
-        body.cyberpunk #app-container { background: #161b22; border: 1px solid #00f2ff; }
-        body.cyberpunk header { background: #00f2ff; color: #000; }
+        body.cyberpunk #app-container { background: #161b22; color: #fff; }
         body.cyberpunk .others { background: #0d1117; color: #00f2ff; border: 1px solid #00f2ff; }
         body.cyberpunk .mine { background: #00f2ff; color: #000; }
-        body.sunset { background: #ff5f6d; }
         body.sunset #app-container { background: #fff5e1; }
         body.sunset header { background: #ff7e5f; }
-        body.forest { background: #1b3d1b; }
-        body.forest #app-container { background: #f0f4f0; }
 
         /* BUBBLES */
         .msg-container { margin-bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
         .mine-container { flex-direction: row-reverse; }
-        .avatar { width: 35px; height: 35px; border-radius: 50%; background: #eee; border: 1px solid #ddd; }
-        .bubble { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: #eee; border: 1px solid #ddd; flex-shrink: 0; }
+        .bubble { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); position: relative; }
         .mine { background: #dcf8c6; border-bottom-right-radius: 2px; }
         .others { background: #fff; border-bottom-left-radius: 2px; }
-        .user-tag { display: block; font-size: 10px; font-weight: bold; margin-bottom: 3px; opacity: 0.7; }
-        .time { font-size: 9px; opacity: 0.5; display: block; text-align: right; margin-top: 5px; }
+        .user-tag { display: block; font-size: 10px; font-weight: bold; margin-bottom: 3px; color: #075e54; }
+        .time { font-size: 9px; opacity: 0.5; display: block; text-align: right; margin-top: 4px; }
 
-        /* INPUT AREA - NUDGED UP */
-        .input-bar { 
-            padding: 15px; 
-            background: #f8f8f8; 
-            display: flex; 
-            gap: 10px; 
-            align-items: center; 
-            border-top: 1px solid #ddd;
-            /* Margin added to ensure it's not at the absolute bottom */
-            margin-bottom: 5px; 
-        }
-        input[type="text"] { flex: 1; padding: 12px 18px; border-radius: 25px; border: 1px solid #ddd; outline: none; font-size: 16px; }
-        button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-        #mic-btn.recording { background: #ff3b30; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        /* INPUT AREA */
+        .input-bar { padding: 10px 15px; background: #f0f0f0; display: flex; gap: 8px; align-items: center; border-top: 1px solid #ddd; margin-bottom: 5px; }
+        input[type="text"] { flex: 1; padding: 12px 18px; border-radius: 25px; border: 1px solid #ccc; outline: none; font-size: 16px; }
+        .btn { background: #075e54; color: white; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
         
+        /* OVERLAY / LOGIN */
         #overlay { position: fixed; inset: 0; background: #fff; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        audio { height: 40px; width: 180px; margin: 5px 0; }
+        .pfp-picker { width: 110px; height: 110px; border-radius: 50%; border: 4px solid #075e54; position: relative; cursor: pointer; overflow: hidden; margin-bottom: 20px; }
+        .pfp-picker img { width: 100%; height: 100%; object-fit: cover; }
+        .pfp-picker .label { position: absolute; bottom: 0; background: rgba(0,0,0,0.5); color: white; width: 100%; text-align: center; font-size: 10px; padding: 2px 0; }
+        audio { height: 35px; width: 160px; margin-top: 5px; }
     </style>
 </head>
 <body>
 <div id="app-container">
     <div id="overlay">
-        <h1 style="color:#075e54">Global Social</h1>
-        <input type="text" id="name-in" placeholder="Your name..." style="width: 250px; padding: 15px; margin: 20px; border-radius: 30px; border: 1px solid #ddd; text-align: center; font-size: 18px;">
-        <button onclick="start()" style="width: 200px; border-radius: 30px;">Join Party</button>
+        <h2 style="color:#075e54">Welcome to Global Social</h2>
+        <div class="pfp-picker" onclick="document.getElementById('file-in').click()">
+            <img id="pfp-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=User1">
+            <div class="label">CHANGE</div>
+        </div>
+        <input type="file" id="file-in" accept="image/*" style="display:none" onchange="handleFile(this)">
+        <input type="text" id="name-in" placeholder="Enter your name..." style="width: 260px; padding: 15px; border-radius: 30px; border: 1px solid #ddd; text-align: center; font-size: 18px; margin-bottom: 20px;">
+        <button onclick="startApp()" class="btn" style="width: 200px; border-radius: 30px;">Enter Chat</button>
     </div>
 
     <header>
-        <div>
-            <strong>Global Social</strong><br>
-            <small id="count">Online: 0</small>
-        </div>
-        <select id="vibe-select" onchange="changeVibe(this.value)" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 10px; padding: 5px;">
-            <option value="default">Default</option>
+        <div><strong>Global Social</strong> <br><small id="count">Online: 1</small></div>
+        <select onchange="socket.emit('vibe_change', {vibe: this.value})" style="border-radius:5px; padding:3px;">
+            <option value="default">Classic</option>
             <option value="cyberpunk">Cyberpunk</option>
             <option value="sunset">Sunset</option>
-            <option value="forest">Forest</option>
         </select>
     </header>
 
     <div id="chat-window"></div>
 
     <div class="input-bar">
-        <input type="text" id="msg-in" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
-        <button id="mic-btn" onclick="toggleRecording()">🎙️</button>
-        <button onclick="send()">➤</button>
+        <input type="text" id="msg-in" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMsg()">
+        <button id="mic-btn" class="btn" onclick="toggleMic()">🎙️</button>
+        <button class="btn" onclick="sendMsg()">➤</button>
     </div>
 </div>
 
 <script>
     const socket = io();
     let myName = localStorage.getItem('chat_name') || "";
+    let myPic = localStorage.getItem('chat_pfp') || "";
     let mediaRecorder;
     let audioChunks = [];
 
-    const getAvatar = (n) => `https://api.dicebear.com/7.x/bottts/svg?seed=${n}`;
-    
-    if (myName) {
-        document.getElementById('overlay').style.display = 'none';
+    if (myName) document.getElementById('overlay').style.display = 'none';
+
+    function handleFile(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('pfp-preview').src = e.target.result;
+                myPic = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
     }
 
-    function start() {
-        const val = document.getElementById('name-in').value.trim();
-        if (val) { 
-            myName = val; 
-            localStorage.setItem('chat_name', val); 
+    function startApp() {
+        const name = document.getElementById('name-in').value.trim();
+        if (name) {
+            myName = name;
+            localStorage.setItem('chat_name', name);
+            localStorage.setItem('chat_pfp', myPic);
             document.getElementById('overlay').style.display = 'none';
         }
     }
 
-    function changeVibe(v) { socket.emit('vibe_change', { vibe: v }); }
-    
-    socket.on('vibe_update', d => {
-        document.body.className = d.vibe;
-        document.getElementById('vibe-select').value = d.vibe;
-    });
-
-    async function toggleRecording() {
-        const btn = document.getElementById('mic-btn');
-        if (!mediaRecorder || mediaRecorder.state === "inactive") {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(audioBlob);
-                    reader.onloadend = () => socket.emit('message', {username: myName, message: reader.result, is_audio: true});
-                    stream.getTracks().forEach(t => t.stop());
-                };
-                mediaRecorder.start();
-                btn.classList.add('recording');
-            } catch(e) { alert("Please enable Microphone access!"); }
-        } else {
-            mediaRecorder.stop();
-            btn.classList.remove('recording');
+    function sendMsg() {
+        const input = document.getElementById('msg-in');
+        if (input.value.trim()) {
+            socket.emit('message', {
+                username: myName, 
+                message: input.value, 
+                profile_pic: myPic, 
+                is_audio: false
+            });
+            input.value = '';
         }
     }
 
-    function send() {
-        const el = document.getElementById('msg-in');
-        if (el.value.trim()) { 
-            socket.emit('message', {username: myName, message: el.value, is_audio: false}); 
-            el.value = ''; 
+    async function toggleMic() {
+        const btn = document.getElementById('mic-btn');
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = () => {
+                    socket.emit('message', {username: myName, message: reader.result, profile_pic: myPic, is_audio: true});
+                };
+            };
+            mediaRecorder.start();
+            btn.style.background = "red";
+        } else {
+            mediaRecorder.stop();
+            btn.style.background = "#075e54";
         }
     }
 
     socket.on('message', d => {
         const win = document.getElementById('chat-window');
         const isMe = d.username === myName;
-        let content = d.is_audio ? `<audio controls src="${d.message}"></audio>` : d.message;
-        win.innerHTML += `<div class="msg-container ${isMe ? 'mine-container' : ''}">
-            <img src="${getAvatar(d.username)}" class="avatar">
-            <div class="bubble ${isMe ? 'mine' : 'others'}">
-                ${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}
-                ${content}<span class="time">${d.time || ''}</span>
-            </div></div>`;
+        const avatar = d.profile_pic || `https://api.dicebear.com/7.x/bottts/svg?seed=${d.username}`;
+        const content = d.is_audio ? `<audio controls src="${d.message}"></audio>` : d.message;
+        
+        win.innerHTML += `
+            <div class="msg-container ${isMe ? 'mine-container' : ''}">
+                <img src="${avatar}" class="avatar">
+                <div class="bubble ${isMe ? 'mine' : 'others'}">
+                    ${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}
+                    ${content}
+                    <span class="time">${d.time || ''}</span>
+                </div>
+            </div>`;
         win.scrollTop = win.scrollHeight;
     });
 
     socket.on('user_count', d => document.getElementById('count').innerText = "Online: " + d.count);
+    socket.on('vibe_update', d => document.body.className = d.vibe);
     socket.on('reload', () => location.reload());
 </script>
 </body>
