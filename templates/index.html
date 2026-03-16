@@ -9,33 +9,35 @@
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #d1d7db; margin: 0; display: flex; justify-content: center; height: 100vh; }
         #app-container { width: 100%; max-width: 450px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; }
-        header { background: #075e54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        #chat-window { flex: 1; background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); overflow-y: auto; padding: 15px; }
+        header { background: #075e54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #chat-window { flex: 1; background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); overflow-y: auto; padding: 15px; scroll-behavior: smooth; }
         .msg-container { margin-bottom: 10px; display: flex; flex-direction: column; }
-        .bubble { max-width: 80%; padding: 8px 12px; border-radius: 8px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
-        .mine { align-self: flex-end; background: #dcf8c6; }
-        .others { align-self: flex-start; background: #fff; }
-        .user-tag { font-size: 11px; font-weight: bold; color: #075e54; display: block; }
+        .bubble { max-width: 85%; padding: 8px 12px; border-radius: 8px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
+        .mine { align-self: flex-end; background: #dcf8c6; border-top-right-radius: 0; }
+        .others { align-self: flex-start; background: #fff; border-top-left-radius: 0; }
+        .user-tag { font-size: 11px; font-weight: bold; color: #075e54; display: block; margin-bottom: 2px; }
+        .time { font-size: 9px; color: #888; float: right; margin-top: 5px; margin-left: 8px; }
         #typing-box { font-size: 12px; color: #555; padding: 5px 15px; background: #f0f0f0; min-height: 22px; }
-        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; }
-        input[type="text"] { flex: 1; padding: 10px; border-radius: 20px; border: none; outline: none; }
-        button { background: #075e54; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
-        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
+        input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
+        button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
 <div id="app-container">
     <div id="overlay">
-        <h1>🌍 Global Social</h1>
-        <input type="text" id="name-in" placeholder="Nickname..." style="width: 80%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px;">
-        <button onclick="start()" style="width: 80%; border-radius: 5px;">Join</button>
+        <h1 style="color:#075e54">🌍 Global Social</h1>
+        <p>Mukono's Live Connection</p>
+        <input type="text" id="name-in" placeholder="Nickname..." style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px;">
+        <button onclick="start()" style="width: 80%; border-radius: 25px;">Join Chat</button>
     </div>
     <header><span>Global Social</span><span id="count">Online: 0</span></header>
     <div id="chat-window"></div>
     <div id="typing-box"></div>
     <div class="input-bar">
-        <input type="text" id="msg-in" placeholder="Message..." oninput="isTyping()">
-        <button onclick="send()">></button>
+        <input type="text" id="msg-in" placeholder="Message..." oninput="isTyping()" onkeypress="if(event.key==='Enter')send()">
+        <button onclick="send()">➤</button>
     </div>
 </div>
 <script>
@@ -47,23 +49,41 @@
         const val = document.getElementById('name-in').value;
         if (val) { myName = val; localStorage.setItem('chat_name', val); document.getElementById('overlay').style.display = 'none'; }
     }
+    
     function send() {
         const el = document.getElementById('msg-in');
-        if (el.value.trim()) { socket.emit('message', {username: myName, message: el.value}); el.value = ''; socket.emit('typing', {username: myName, status: false}); }
+        if (el.value.trim()) { 
+            socket.emit('message', {username: myName, message: el.value}); 
+            el.value = ''; 
+            socket.emit('typing', {username: myName, status: false}); 
+        }
     }
+
     function isTyping() {
         socket.emit('typing', {username: myName, status: true});
         clearTimeout(window.t);
         window.t = setTimeout(() => socket.emit('typing', {username: myName, status: false}), 2000);
     }
+
     socket.on('user_count', d => document.getElementById('count').innerText = "Online: " + d.count);
+    
     socket.on('message', d => {
         const win = document.getElementById('chat-window');
         const isMe = d.username === myName;
-        win.innerHTML += `<div class="msg-container"><div class="bubble ${isMe ? 'mine' : 'others'}">${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}${d.message}</div></div>`;
-        win.scrollTop = win.scrollHeight;
+        win.innerHTML += `
+            <div class="msg-container">
+                <div class="bubble ${isMe ? 'mine' : 'others'}">
+                    ${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}
+                    ${d.message}
+                    <span class="time">${d.time || ''}</span>
+                </div>
+            </div>`;
+        win.scrollTop = win.scrollHeight; // AUTO-SCROLL
     });
+
     socket.on('display_typing', d => document.getElementById('typing-box').innerText = d.status ? d.username + " is typing..." : "");
+    
+    socket.on('reload', () => location.reload()); // For the /clear command
 </script>
 </body>
 </html>
