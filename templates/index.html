@@ -6,13 +6,17 @@
     <title>Global Social</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        #app-container { background: white; width: 90%; max-width: 400px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 20px; text-align: center; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        #app-container { background: white; width: 95%; max-width: 450px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 25px; text-align: center; }
+        #status-bar { background: #e3f2fd; padding: 6px 15px; border-radius: 20px; display: inline-block; font-size: 13px; color: #007bff; margin-bottom: 15px; font-weight: bold; }
         #chat-container { display: none; }
-        #messages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; text-align: left; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
-        input { width: 80%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-        button { padding: 10px 20px; cursor: pointer; background-color: #0084ff; color: white; border: none; border-radius: 5px; font-weight: bold; }
-        .logout-btn { background-color: #ff4b4b; margin-top: 10px; font-size: 12px; padding: 5px 10px; }
+        #messages { height: 350px; overflow-y: auto; border: 1px solid #f0f0f0; padding: 15px; margin-bottom: 5px; border-radius: 12px; background: #fafafa; text-align: left; }
+        #typing-indicator { height: 20px; font-size: 12px; color: #888; font-style: italic; text-align: left; padding-left: 5px; margin-bottom: 10px; }
+        .input-area { display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        button { padding: 10px 20px; background-color: #0084ff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .logout-btn { background: none; color: #ff4b4b; border: none; font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 15px; }
+        p { margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -20,70 +24,85 @@
 <div id="app-container">
     <div id="join-container">
         <h1>🌍 Global Social</h1>
+        <p>Connect with anyone, anywhere.</p>
         <input type="text" id="nickname-input" placeholder="Enter your nickname...">
-        <button onclick="joinWorld()">Join World</button>
+        <br>
+        <button onclick="joinWorld()">Start Chatting</button>
     </div>
 
     <div id="chat-container">
-        <h3 id="welcome-msg">Chatting as: </h3>
+        <div id="status-bar">🟢 Online: <span id="online-count">1</span></div>
         <div id="messages"></div>
-        <input type="text" id="message-input" placeholder="Type a message...">
-        <button onclick="sendMessage()">Send</button>
-        <br>
-        <button class="logout-btn" onclick="logout()">Exit / Change Name</button>
+        <div id="typing-indicator"></div>
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type a message..." oninput="notifyTyping()">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout / Change Name</button>
     </div>
 </div>
 
 <script>
     const socket = io();
     let currentUser = "";
+    let typingTimeout;
 
-    // 1. On page load, check if the user is already "Logged In"
+    // Check for saved name on startup
     document.addEventListener('DOMContentLoaded', () => {
         const savedName = localStorage.getItem('chat_nickname');
-        if (savedName) {
-            autoJoin(savedName);
-        }
+        if (savedName) autoJoin(savedName);
     });
 
     function autoJoin(name) {
         currentUser = name;
-        showChat(name);
-        socket.emit('join', {username: name});
+        document.getElementById('join-container').style.display = 'none';
+        document.getElementById('chat-container').style.display = 'block';
     }
 
     function joinWorld() {
         const name = document.getElementById('nickname-input').value;
-        if (name) {
-            localStorage.setItem('chat_nickname', name); // 2. SAVE to browser notebook
+        if (name.trim()) {
+            localStorage.setItem('chat_nickname', name);
             autoJoin(name);
         }
     }
 
-    function showChat(name) {
-        document.getElementById('join-container').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'block';
-        document.getElementById('welcome-msg').innerText = "Chatting as: " + name;
-    }
-
     function sendMessage() {
         const msgInput = document.getElementById('message-input');
-        if (msgInput.value) {
+        if (msgInput.value.trim()) {
             socket.emit('message', {username: currentUser, message: msgInput.value});
             msgInput.value = '';
+            socket.emit('typing', {username: currentUser, isTyping: false});
         }
     }
 
-    function logout() {
-        localStorage.removeItem('chat_nickname'); // 3. WIPE the notebook
-        location.reload(); // Refresh to show join screen
+    function notifyTyping() {
+        socket.emit('typing', {username: currentUser, isTyping: true});
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit('typing', {username: currentUser, isTyping: false});
+        }, 2000);
     }
 
-    socket.on('message', function(data) {
+    socket.on('user_count', (data) => {
+        document.getElementById('online-count').innerText = data.count;
+    });
+
+    socket.on('message', (data) => {
         const msgDiv = document.getElementById('messages');
         msgDiv.innerHTML += `<p><strong>${data.username}:</strong> ${data.message}</p>`;
         msgDiv.scrollTop = msgDiv.scrollHeight;
     });
+
+    socket.on('display_typing', (data) => {
+        const indicator = document.getElementById('typing-indicator');
+        indicator.innerText = data.isTyping ? `${data.username} is typing...` : "";
+    });
+
+    function logout() {
+        localStorage.removeItem('chat_nickname');
+        location.reload();
+    }
 </script>
 
 </body>
