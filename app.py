@@ -1,21 +1,23 @@
+import os
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
-from flask_sqlalchemy import SQLAlchemy # This handles the database
-import os
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-# Set up the database file
+
+# Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# This creates the "Message" table in our database
+# Database Model
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50))
-    content = db.Column(db.String(500))
+    username = db.Column(db.String(50), nullable=False)
+    content = db.Column(db.String(500), nullable=False)
 
-# Create the database file if it doesn't exist
+# Create database tables
 with app.app_context():
     db.create_all()
 
@@ -31,18 +33,16 @@ def handle_connect():
     connected_users += 1
     emit('user_count', {'count': connected_users}, broadcast=True)
     
-    # NEW: When someone connects, send them ALL old messages from the database
-    old_messages = Message.query.all()
-    for msg in old_messages:
+    # Send message history to the new user
+    messages = Message.query.all()
+    for msg in messages:
         emit('message', {'username': msg.username, 'message': msg.content})
 
 @socketio.on('message')
 def handle_message(data):
-    # SAVE the message to the database notebook
     new_msg = Message(username=data['username'], content=data['message'])
     db.session.add(new_msg)
     db.session.commit()
-    
     emit('message', data, broadcast=True)
 
 @socketio.on('typing')
@@ -56,4 +56,6 @@ def handle_disconnect():
     emit('user_count', {'count': connected_users}, broadcast=True)
 
 if __name__ == '__main__':
-    socketio.run(app)
+    # Critical for Render: listen on the port Render gives us
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
