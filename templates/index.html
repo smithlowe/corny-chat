@@ -3,59 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Social</title>
+    <title>Global Social Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #d1d7db; margin: 0; display: flex; justify-content: center; height: 100vh; }
         #app-container { width: 100%; max-width: 450px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; }
-        
-        /* Header */
-        header { background: #075e54; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 5; }
-        
-        /* Chat Area */
+        header { background: #075e54; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 5; }
         #chat-window { flex: 1; background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); overflow-y: auto; padding: 15px; scroll-behavior: smooth; }
-        
-        /* Message Layout */
         .msg-container { margin-bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
         .mine-container { flex-direction: row-reverse; }
-        
-        /* Avatar Circle */
-        .avatar { width: 35px; height: 35px; border-radius: 50%; background: #eee; border: 1px solid #ddd; }
-        
-        /* Bubbles */
+        .avatar { width: 35px; height: 35px; border-radius: 50%; background: #eee; }
         .bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
         .mine { background: #dcf8c6; border-bottom-right-radius: 2px; }
         .others { background: #fff; border-bottom-left-radius: 2px; }
-        
-        .user-tag { font-size: 11px; font-weight: bold; color: #075e54; display: block; margin-bottom: 2px; }
+        .shared-img { width: 100%; border-radius: 8px; margin-top: 5px; display: block; cursor: pointer; }
         .time { font-size: 9px; color: #888; float: right; margin-top: 5px; margin-left: 8px; }
-
-        /* Input Area */
         #typing-box { font-size: 12px; color: #555; padding: 5px 15px; background: #f0f0f0; min-height: 22px; }
         .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
         button { background: #075e54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 20px; }
-
-        /* Welcome Screen */
-        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        #overlay { position: absolute; inset: 0; background: white; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
     </style>
 </head>
 <body>
 <div id="app-container">
     <div id="overlay">
         <h1 style="color:#075e54">🌍 Global Social</h1>
-        <p>Your identity in Mukono</p>
         <div id="avatar-preview" style="margin-bottom:15px"></div>
-        <input type="text" id="name-in" placeholder="Enter Nickname..." oninput="updatePreview()" style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px; text-align:center;">
+        <input type="text" id="name-in" placeholder="Nickname..." oninput="updatePreview()" style="width: 80%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 25px; text-align:center;">
         <button onclick="start()" style="width: 80%; border-radius: 25px;">Join Chat</button>
     </div>
 
     <header>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <img id="my-mini-avatar" src="" class="avatar" style="display:none; width:30px; height:30px;">
-            <span>Global Social</span>
-        </div>
+        <span>Global Social</span>
         <span id="count">Online: 0</span>
     </header>
 
@@ -63,74 +44,67 @@
     <div id="typing-box"></div>
 
     <div class="input-bar">
-        <input type="text" id="msg-in" placeholder="Message..." oninput="isTyping()" onkeypress="if(event.key==='Enter')send()">
+        <input type="text" id="msg-in" placeholder="Message or Image Link..." onkeypress="if(event.key==='Enter')send()">
         <button onclick="send()">➤</button>
     </div>
 </div>
 
+<audio id="ping-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
+
 <script>
     const socket = io();
     let myName = localStorage.getItem('chat_name') || "";
-    
-    // Function to get an Avatar URL based on a name
     const getAvatar = (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`;
 
     function updatePreview() {
         const name = document.getElementById('name-in').value;
-        if(name) {
-            document.getElementById('avatar-preview').innerHTML = `<img src="${getAvatar(name)}" class="avatar" style="width:80px; height:80px;">`;
-        }
+        if(name) document.getElementById('avatar-preview').innerHTML = `<img src="${getAvatar(name)}" style="width:80px; height:80px; border-radius:50%">`;
     }
 
-    if (myName) {
-        document.getElementById('overlay').style.display = 'none';
-        document.getElementById('my-mini-avatar').src = getAvatar(myName);
-        document.getElementById('my-mini-avatar').style.display = 'block';
-    }
+    if (myName) document.getElementById('overlay').style.display = 'none';
 
     function start() {
         const val = document.getElementById('name-in').value;
-        if (val) { 
-            myName = val; 
-            localStorage.setItem('chat_name', val); 
-            location.reload(); 
-        }
+        if (val) { myName = val; localStorage.setItem('chat_name', val); location.reload(); }
     }
-    
+
+    // NEW: Function to check if a message is an image link
+    function formatMessage(text) {
+        const urlPattern = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp))/i;
+        if (urlPattern.test(text)) {
+            return `<img src="${text}" class="shared-img" onclick="window.open('${text}')">`;
+        }
+        return text;
+    }
+
     function send() {
         const el = document.getElementById('msg-in');
         if (el.value.trim()) { 
             socket.emit('message', {username: myName, message: el.value}); 
             el.value = ''; 
-            socket.emit('typing', {username: myName, status: false}); 
         }
     }
 
-    function isTyping() {
-        socket.emit('typing', {username: myName, status: true});
-        clearTimeout(window.t);
-        window.t = setTimeout(() => socket.emit('typing', {username: myName, status: false}), 2000);
-    }
-
-    socket.on('user_count', d => document.getElementById('count').innerText = "Online: " + d.count);
-    
     socket.on('message', d => {
         const win = document.getElementById('chat-window');
         const isMe = d.username === myName;
         
+        // Play sound if message is from someone else
+        if (!isMe) document.getElementById('ping-sound').play().catch(() => {});
+
         win.innerHTML += `
             <div class="msg-container ${isMe ? 'mine-container' : ''}">
                 <img src="${getAvatar(d.username)}" class="avatar">
                 <div class="bubble ${isMe ? 'mine' : 'others'}">
                     ${!isMe ? `<span class="user-tag">${d.username}</span>` : ''}
-                    ${d.message}
+                    ${formatMessage(d.message)}
                     <span class="time">${d.time || ''}</span>
                 </div>
             </div>`;
         win.scrollTop = win.scrollHeight;
     });
 
-    socket.on('display_typing', d => document.getElementById('typing-box').innerText = d.status ? d.username + " is typing..." : "");
+    socket.on('user_count', d => document.getElementById('count').innerText = "Online: " + d.count);
     socket.on('reload', () => location.reload());
 </script>
 </body>
