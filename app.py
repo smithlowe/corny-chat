@@ -6,12 +6,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# Database Configuration
+# Database
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///chat.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# SocketIO setup with 10MB limit for high-quality audio and images
+# Buffer for images (Crucial for gallery upload)
 socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10000000)
 
 class Message(db.Model):
@@ -20,32 +20,14 @@ class Message(db.Model):
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.String(10), default=lambda: datetime.now().strftime("%H:%M"))
     is_audio = db.Column(db.Boolean, default=False)
-    profile_pic = db.Column(db.Text, nullable=True)  # Stores the Base64 image string
+    profile_pic = db.Column(db.Text, nullable=True)
 
 with app.app_context():
     db.create_all()
 
-connected_users = 0
-
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@socketio.on('connect')
-def handle_connect():
-    global connected_users
-    connected_users += 1
-    emit('user_count', {'count': connected_users}, broadcast=True)
-    # Load history
-    messages = Message.query.order_by(Message.id.asc()).all()
-    for msg in messages:
-        emit('message', {
-            'username': msg.username, 
-            'message': msg.content, 
-            'time': msg.timestamp, 
-            'is_audio': msg.is_audio,
-            'profile_pic': msg.profile_pic
-        })
 
 @socketio.on('message')
 def handle_message(data):
@@ -70,12 +52,6 @@ def handle_message(data):
 @socketio.on('vibe_change')
 def handle_vibe(data):
     emit('vibe_update', data, broadcast=True)
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    global connected_users
-    connected_users = max(0, connected_users - 1)
-    emit('user_count', {'count': connected_users}, broadcast=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
