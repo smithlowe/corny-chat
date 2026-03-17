@@ -4,13 +4,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'social_secret_123'
+app.config['SECRET_KEY'] = 'social_secret_777'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# Buffer increased to 20MB for higher quality audio
-socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=20000000)
+# Massive 50MB buffer to handle high-quality voice notes and large images
+socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=50000000)
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,6 +42,7 @@ def handle_message(data):
     )
     db.session.add(new_msg)
     db.session.commit()
+    # Broadcast everything (including the audio key)
     emit('message', data, broadcast=True)
 
 if __name__ == '__main__':
