@@ -1,5 +1,5 @@
 from datetime import datetime
-import pytz # Optional: if you want specific Uganda time
+ # Optional: if you want specific Uganda time
 
 @socketio.on('message')
 def handle_message(data):
