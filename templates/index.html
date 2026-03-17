@@ -2,22 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Social</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; width: 100%; overflow: hidden; position: fixed; }
-        body { font-family: -apple-system, sans-serif; background: #e5ddd5; display: flex; justify-content: center; }
-
-        #app { 
-            width: 100%; max-width: 500px; 
-            height: 100dvh; /* The Mobile Fix */
-            background: #fff; display: flex; flex-direction: column; 
-        }
-
-        header { background: #075e54; color: white; padding: 15px; flex-shrink: 0; display: flex; justify-content: space-between; }
-        #chat { flex: 1; overflow-y: auto; padding: 15px; background: #f0f2f5; -webkit-overflow-scrolling: touch; }
+        body { font-family: -apple-system, sans-serif; background: #e5ddd5; display: flex; justify-content: center; height: 100vh; }
+        #app { width: 100%; max-width: 500px; height: 100%; background: #fff; display: flex; flex-direction: column; }
+        
+        header { background: #075e54; color: white; padding: 15px; flex-shrink: 0; text-align: center; }
+        #chat { flex: 1; overflow-y: auto; padding: 15px; background: #f0f2f5; }
 
         .msg-row { margin-bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
         .is-me { flex-direction: row-reverse; }
@@ -25,17 +19,13 @@
         .bubble { max-width: 75%; padding: 10px; border-radius: 12px; font-size: 15px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
         .mine { background: #dcf8c6; }
         .theirs { background: #fff; }
-        .u-name { font-size: 10px; font-weight: bold; color: #075e54; display: block; margin-bottom: 2px; }
 
-        .input-bar { 
-            padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; 
-            flex-shrink: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-        }
-        #msg-in { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; font-size: 16px; outline: none; }
-        .btn { width: 42px; height: 42px; border-radius: 50%; background: #075e54; color: white; border: none; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .input-bar { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; border-top: 1px solid #ddd; }
+        #msg-in { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
+        .btn { width: 42px; height: 42px; border-radius: 50%; background: #075e54; color: white; border: none; font-size: 18px; cursor: pointer; }
 
         #login { position: fixed; inset: 0; background: #fff; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .pfp-pick { width: 110px; height: 110px; border-radius: 50%; border: 3px solid #075e54; margin-bottom: 15px; object-fit: cover; cursor: pointer; }
+        .pfp-pick { width: 110px; height: 110px; border-radius: 50%; border: 3px solid #075e54; margin-bottom: 15px; cursor: pointer; object-fit: cover; }
     </style>
 </head>
 <body>
@@ -43,16 +33,10 @@
     <div id="login">
         <img id="pre" class="pfp-pick" src="https://api.dicebear.com/7.x/bottts/svg?seed=1" onclick="document.getElementById('fin').click()">
         <input type="file" id="fin" accept="image/*" style="display:none" onchange="imgL(this)">
-        <input type="text" id="nin" placeholder="Your Name" style="width:250px; padding:12px; border-radius:20px; border:1px solid #ddd; text-align:center; margin-bottom:15px; font-size:16px;">
-        <button onclick="go()" class="btn" style="width:150px; border-radius:20px;">Join</button>
+        <input type="text" id="nin" placeholder="Enter Name" style="width:250px; padding:12px; border-radius:20px; border:1px solid #ddd; text-align:center; margin-bottom:15px;">
+        <button onclick="go()" class="btn" style="width:150px; border-radius:20px;">Join Chat</button>
     </div>
-    <header>
-        <strong>Global Social</strong>
-        <select onchange="socket.emit('vibe_change', {vibe: this.value})">
-            <option value="default">Day</option>
-            <option value="sunset">Sunset</option>
-        </select>
-    </header>
+    <header><strong>Global Social</strong></header>
     <div id="chat"></div>
     <div class="input-bar">
         <input type="text" id="msg-in" placeholder="Message" onkeypress="if(event.key==='Enter')send()">
@@ -99,13 +83,11 @@
         w.innerHTML += `<div class="msg-row ${me ? 'is-me' : ''}">
             <img src="${pic}" class="pfp">
             <div class="bubble ${me ? 'mine' : 'theirs'}">
-                ${!me ? `<span class="u-name">${d.username}</span>` : ''}
+                ${!me ? `<span style="font-size:10px; font-weight:bold; color:#075e54; display:block;">${d.username}</span>` : ''}
                 ${d.is_audio ? `<audio controls src="${d.message}"></audio>` : d.message}
             </div></div>`;
         w.scrollTop = w.scrollHeight;
     });
-    socket.on('vibe_update', d => document.body.className = d.vibe);
-    socket.on('reload', () => location.reload());
 </script>
 </body>
 </html>

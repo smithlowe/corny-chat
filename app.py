@@ -6,12 +6,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# Database
+# Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///chat.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Buffer for images (Crucial for gallery upload)
+# HD Buffer for Gallery Images
 socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10000000)
 
 class Message(db.Model):
@@ -48,10 +48,6 @@ def handle_message(data):
     
     data['time'] = datetime.now().strftime("%H:%M")
     emit('message', data, broadcast=True)
-
-@socketio.on('vibe_change')
-def handle_vibe(data):
-    emit('vibe_update', data, broadcast=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
