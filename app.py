@@ -11,7 +11,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# SocketIO setup with 10MB limit for high-quality audio and images
+# SocketIO setup with 10MB limit for high-quality images/audio
 socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10000000)
 
 class Message(db.Model):
@@ -20,12 +20,10 @@ class Message(db.Model):
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.String(10), default=lambda: datetime.now().strftime("%H:%M"))
     is_audio = db.Column(db.Boolean, default=False)
-    profile_pic = db.Column(db.Text, nullable=True)
+    profile_pic = db.Column(db.Text, nullable=True) # Stores Base64 Gallery Image
 
 with app.app_context():
     db.create_all()
-
-connected_users = 0
 
 @app.route('/')
 def index():
@@ -33,9 +31,6 @@ def index():
 
 @socketio.on('connect')
 def handle_connect():
-    global connected_users
-    connected_users += 1
-    emit('user_count', {'count': connected_users}, broadcast=True)
     messages = Message.query.order_by(Message.id.asc()).all()
     for msg in messages:
         emit('message', {
@@ -62,18 +57,13 @@ def handle_message(data):
     )
     db.session.add(new_msg)
     db.session.commit()
+    
     data['time'] = datetime.now().strftime("%H:%M")
     emit('message', data, broadcast=True)
 
 @socketio.on('vibe_change')
 def handle_vibe(data):
     emit('vibe_update', data, broadcast=True)
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    global connected_users
-    connected_users = max(0, connected_users - 1)
-    emit('user_count', {'count': connected_users}, broadcast=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
