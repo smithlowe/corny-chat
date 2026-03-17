@@ -2,54 +2,91 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <title>Global Social</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: -apple-system, sans-serif; background: #e5ddd5; margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
-        #app { width: 100%; max-width: 500px; height: 100%; background: #fff; display: flex; flex-direction: column; position: relative; }
-        header { background: #075e54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        #chat { flex: 1; overflow-y: auto; padding: 15px; background: #fdfdfd; }
-        
-        /* Message Styling */
-        .msg-row { margin-bottom: 15px; display: flex; align-items: flex-end; gap: 10px; }
-        .is-me { flex-direction: row-reverse; }
-        .pfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #ddd; }
-        .bubble { max-width: 75%; padding: 12px; border-radius: 15px; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .mine { background: #dcf8c6; border-bottom-right-radius: 2px; }
-        .theirs { background: #fff; border-bottom-left-radius: 2px; }
-        .user-label { font-size: 11px; font-weight: bold; color: #075e54; margin-bottom: 4px; display: block; }
-        
-        /* Mobile Input Bar */
-        .input-bar { padding: 15px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; padding-bottom: calc(15px + env(safe-area-inset-bottom)); }
-        #msg-in { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; font-size: 16px; outline: none; }
-        .circle-btn { width: 45px; height: 45px; border-radius: 50%; background: #075e54; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        /* RESET & MOBILE LOCK */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { 
+            height: 100%; width: 100%; 
+            overflow: hidden; position: fixed; 
+            background: #e5ddd5;
+        }
 
-        /* Login Screen */
-        #login { position: fixed; inset: 0; background: #fff; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .pfp-preview { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #075e54; margin-bottom: 20px; cursor: pointer; object-fit: cover; }
-        
-        /* Vibes */
-        body.sunset #app { background: #fff5e1; }
-        body.sunset header { background: #ff7e5f; }
+        #app { 
+            width: 100%; max-width: 500px; 
+            height: 100dvh; /* Dynamic height for mobile browsers */
+            background: #fff; display: flex; flex-direction: column; 
+            margin: 0 auto;
+        }
+
+        /* HEADER */
+        header { 
+            background: #075e54; color: white; 
+            padding: 15px; flex-shrink: 0; 
+            display: flex; justify-content: space-between; align-items: center;
+            padding-top: env(safe-area-inset-top, 15px);
+        }
+
+        /* CHAT WINDOW */
+        #chat { 
+            flex: 1; overflow-y: auto; padding: 15px; 
+            background: #f0f2f5; -webkit-overflow-scrolling: touch; 
+        }
+
+        .msg-row { margin-bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
+        .is-me { flex-direction: row-reverse; }
+        .pfp { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid #ddd; }
+        .bubble { max-width: 75%; padding: 10px; border-radius: 12px; font-size: 15px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+        .mine { background: #dcf8c6; }
+        .theirs { background: #fff; }
+
+        /* THE MOBILE INPUT BAR FIX */
+        .input-bar { 
+            padding: 10px 15px; 
+            background: #f0f0f0; 
+            display: flex; gap: 10px; align-items: center; 
+            flex-shrink: 0;
+            /* This ensures it stays above the iPhone home bar and Android buttons */
+            padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px)); 
+            border-top: 1px solid #ddd;
+        }
+
+        #msg-in { 
+            flex: 1; padding: 12px 18px; border-radius: 25px; 
+            border: 1px solid #ccc; font-size: 16px; /* 16px prevents auto-zoom on iPhone */
+            outline: none; background: white;
+        }
+
+        .btn { 
+            width: 44px; height: 44px; border-radius: 50%; 
+            background: #075e54; color: white; border: none; 
+            display: flex; align-items: center; justify-content: center; font-size: 20px; 
+        }
+
+        /* LOGIN SCREEN */
+        #login { 
+            position: fixed; inset: 0; background: #fff; z-index: 1000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        }
+        .pfp-pick { width: 110px; height: 110px; border-radius: 50%; border: 3px solid #075e54; margin-bottom: 20px; object-fit: cover; }
     </style>
 </head>
-<body class="default">
+<body>
 <div id="app">
     <div id="login">
-        <h2 style="color:#075e54">Global Social</h2>
-        <img id="preview-img" class="pfp-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=Bot" onclick="document.getElementById('file-in').click()">
-        <input type="file" id="file-in" accept="image/*" style="display:none" onchange="loadImg(this)">
-        <p style="font-size: 12px; color: #666;">Tap the robot to choose a photo</p>
-        <input type="text" id="user-in" placeholder="Enter Name..." style="width: 250px; padding: 15px; border-radius: 25px; border: 1px solid #ddd; text-align: center; margin-bottom: 20px;">
-        <button onclick="join()" class="circle-btn" style="width: 200px; border-radius: 25px;">Start Chatting</button>
+        <h2 style="color:#075e54; margin-bottom: 20px;">Welcome</h2>
+        <img id="pre" class="pfp-pick" src="https://api.dicebear.com/7.x/bottts/svg?seed=1" onclick="document.getElementById('fin').click()">
+        <input type="file" id="fin" accept="image/*" style="display:none" onchange="imgL(this)">
+        <input type="text" id="nin" placeholder="Enter Your Name" style="width:260px; padding:15px; border-radius:30px; border:1px solid #ddd; text-align:center; margin-bottom:20px; font-size:18px;">
+        <button onclick="go()" class="btn" style="width:180px; border-radius:30px;">Enter Chat</button>
     </div>
 
     <header>
-        <div><strong>Chat Room</strong></div>
-        <select onchange="socket.emit('vibe_change', {vibe: this.value})">
-            <option value="default">Classic</option>
+        <strong>Global Social</strong>
+        <select onchange="socket.emit('vibe_change', {vibe: this.value})" style="padding: 5px; border-radius: 5px;">
+            <option value="default">Day</option>
             <option value="sunset">Sunset</option>
         </select>
     </header>
@@ -57,82 +94,70 @@
     <div id="chat"></div>
 
     <div class="input-bar">
-        <input type="text" id="msg-in" placeholder="Type..." onkeypress="if(event.key==='Enter')send()">
-        <button id="mic" class="circle-btn" onclick="toggleMic()">🎙️</button>
-        <button class="circle-btn" onclick="send()">➤</button>
+        <input type="text" id="msg-in" placeholder="Type a message..." onkeypress="if(event.key==='Enter')send()">
+        <button id="mic" class="btn" onclick="voc()">🎙️</button>
+        <button class="btn" onclick="send()">➤</button>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let myName = localStorage.getItem('chat_name') || "";
-    let myPfp = localStorage.getItem('chat_pfp') || "";
-    let recorder, chunks = [];
+    let myN = localStorage.getItem('cn') || "", myP = localStorage.getItem('cp') || "", rec, bits = [];
+    
+    if (myN) document.getElementById('login').style.display = 'none';
 
-    if (myName) document.getElementById('login').style.display = 'none';
-
-    function loadImg(input) {
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                document.getElementById('preview-img').src = e.target.result;
-                myPfp = e.target.result;
-            };
-            reader.readAsDataURL(input.files[0]);
+    function imgL(i) {
+        if (i.files && i.files[0]) {
+            const r = new FileReader();
+            r.onload = (e) => { document.getElementById('pre').src = e.target.result; myP = e.target.result; };
+            r.readAsDataURL(i.files[0]);
         }
     }
 
-    function join() {
-        const n = document.getElementById('user-in').value.trim();
-        if (n) {
-            myName = n;
-            localStorage.setItem('chat_name', n);
-            localStorage.setItem('chat_pfp', myPfp);
-            document.getElementById('login').style.display = 'none';
+    function go() {
+        const n = document.getElementById('nin').value.trim();
+        if (n) { 
+            myN = n; 
+            localStorage.setItem('cn', n); 
+            localStorage.setItem('cp', myP); 
+            document.getElementById('login').style.display = 'none'; 
         }
     }
 
     function send() {
         const i = document.getElementById('msg-in');
-        if (i.value.trim()) {
-            socket.emit('message', {username: myName, message: i.value, profile_pic: myPfp, is_audio: false});
-            i.value = '';
+        if (i.value.trim()) { 
+            socket.emit('message', {username: myN, message: i.value, profile_pic: myP, is_audio: false}); 
+            i.value = ''; 
         }
     }
 
-    async function toggleMic() {
-        const btn = document.getElementById('mic');
-        if (!recorder || recorder.state === "inactive") {
+    async function voc() {
+        const b = document.getElementById('mic');
+        if (!rec || rec.state === "inactive") {
             const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-            recorder = new MediaRecorder(s);
-            chunks = [];
-            recorder.ondataavailable = e => chunks.push(e.data);
-            recorder.onstop = () => {
-                const reader = new FileReader();
-                reader.readAsDataURL(new Blob(chunks));
-                reader.onloadend = () => socket.emit('message', {username: myName, message: reader.result, profile_pic: myPfp, is_audio: true});
+            rec = new MediaRecorder(s); bits = [];
+            rec.ondataavailable = e => bits.push(e.data);
+            rec.onstop = () => {
+                const r = new FileReader(); r.readAsDataURL(new Blob(bits));
+                r.onloadend = () => socket.emit('message', {username: myN, message: r.result, profile_pic: myP, is_audio: true});
             };
-            recorder.start();
-            btn.style.background = "red";
-        } else {
-            recorder.stop();
-            btn.style.background = "#075e54";
-        }
+            rec.start(); b.style.background = "red";
+        } else { rec.stop(); b.style.background = "#075e54"; }
     }
 
     socket.on('message', d => {
-        const win = document.getElementById('chat');
-        const isMe = d.username === myName;
-        const img = d.profile_pic || `https://api.dicebear.com/7.x/bottts/svg?seed=${d.username}`;
-        win.innerHTML += `
-            <div class="msg-row ${isMe ? 'is-me' : ''}">
-                <img src="${img}" class="pfp">
-                <div class="bubble ${isMe ? 'mine' : 'theirs'}">
-                    ${!isMe ? `<span class="user-label">${d.username}</span>` : ''}
-                    ${d.is_audio ? `<audio controls src="${d.message}"></audio>` : d.message}
+        const w = document.getElementById('chat'); const me = d.username === myN;
+        const pic = d.profile_pic || `https://api.dicebear.com/7.x/bottts/svg?seed=${d.username}`;
+        w.innerHTML += `
+            <div class="msg-row ${me ? 'is-me' : ''}">
+                <img src="${pic}" class="pfp">
+                <div class="bubble ${me ? 'mine' : 'theirs'}">
+                    ${!me ? `<span style="font-size:10px; font-weight:bold; color:#075e54; display:block;">${d.username}</span>` : ''}
+                    ${d.is_audio ? `<audio controls src="${d.message}" style="width:180px;"></audio>` : d.message}
                 </div>
             </div>`;
-        win.scrollTop = win.scrollHeight;
+        w.scrollTop = w.scrollHeight;
     });
 
     socket.on('vibe_update', d => document.body.className = d.vibe);
