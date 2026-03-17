@@ -64,3 +64,12 @@
     </script>
 </body>
 </html>
+<div style="background: #e65100; color: white; padding: 5px 15px; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+    <span>Corny Chat 🌽</span>
+    <span id="online-count">Online: 1</span>
+</div>
+
+// Listen for the 'user_count' signal from the server
+socket.on('user_count', d => {
+    document.getElementById('online-count').innerText = `Online: ${d.count}`;
+});

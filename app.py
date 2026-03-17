@@ -16,3 +16,19 @@ def handle_message(data):
     # 2. Add the time to the data package before shouting it out
     data['time'] = now
     emit('message', data, broadcast=True)
+    # Add this near the top of your app.py
+online_users = 0
+
+@socketio.on('connect')
+def handle_connect():
+    global online_users
+    online_users += 1
+    # Tell everyone the new count
+    emit('user_count', {'count': online_users}, broadcast=True)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    global online_users
+    online_users -= 1
+    # Tell everyone the new count
+    emit('user_count', {'count': online_users}, broadcast=True)
