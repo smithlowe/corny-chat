@@ -11,13 +11,14 @@
         .controls { padding: 15px; background: #fbc02d; display: flex; gap: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
         input { padding: 10px; border-radius: 20px; border: 2px solid #f9a825; outline: none; }
         button { background: #e65100; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        button:hover { background: #ef6c00; }
     </style>
 </head>
 <body>
 
     <div id="chat">
-        <div class="msg"><b>System:</b> Welcome to Corny Chat! 🌽</div>
+        {% for m in history %}
+            <div class="msg"><b>{{ m.user }}:</b> {{ m.text }}</div>
+        {% endfor %}
     </div>
 
     <div class="controls">
@@ -28,6 +29,12 @@
 
     <script>
         const socket = io();
+
+        // Auto-scroll to bottom on page load so you see the latest messages
+        window.onload = () => {
+            const chat = document.getElementById('chat');
+            chat.scrollTop = chat.scrollHeight;
+        };
 
         function send() {
             const u = document.getElementById('user').value || "Anonymous";
