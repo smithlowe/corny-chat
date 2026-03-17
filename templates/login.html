@@ -2,142 +2,49 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Social</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <title>Join Global Social</title>
     <style>
-        body { font-family: sans-serif; background: #e5ddd5; margin: 0; height: 100vh; display: flex; flex-direction: column; }
-        header { background: #075e54; color: white; padding: 10px 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .header-top { display: flex; justify-content: space-between; align-items: center; }
-        #status-bar { font-size: 11px; color: #dcf8c6; margin-top: 4px; height: 14px; }
-        
-        #chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { display: flex; align-items: flex-end; gap: 8px; max-width: 85%; }
-        .msg.me { align-self: flex-end; flex-direction: row-reverse; }
-        .pfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1.5px solid #fff; }
-        
-        .bubble { padding: 8px 12px; border-radius: 12px; background: white; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; min-width: 60px; }
-        .me .bubble { background: #dcf8c6; }
-        
-        .time { font-size: 9px; color: #999; display: block; text-align: right; margin-top: 4px; }
-        .me .time { color: #66b16d; }
-
-        .input-area { padding: 10px; background: #f0f0f0; display: flex; gap: 8px; align-items: center; }
-        input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
-        
-        #login { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn-icon { background: none; border: none; font-size: 22px; cursor: pointer; }
-        .recording-active { animation: pulse 1.5s infinite; color: #ff3b30 !important; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-        audio { height: 35px; width: 190px; display: block; margin-top: 5px; }
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+        .pfp-preview { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #075e54; cursor: pointer; object-fit: cover; margin-bottom: 15px; }
+        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 25px; box-sizing: border-box; }
+        .btn { background: #075e54; color: white; border: none; padding: 12px 40px; border-radius: 25px; cursor: pointer; font-weight: bold; width: 100%; }
+        .google-btn { background: white; color: #444; border: 1px solid #ddd; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
     </style>
 </head>
 <body>
-
-<div id="login">
-    <img id="pre" style="width:100px; height:100px; border-radius:50%; border:3px solid #075e54; margin-bottom:15px; object-fit:cover;" src="https://api.dicebear.com/7.x/bottts/svg?seed=user" onclick="document.getElementById('file').click()">
-    <input type="file" id="file" hidden accept="image/*" onchange="upload(this)">
-    <input type="text" id="user-in" placeholder="Enter Name" style="padding:10px; width:200px; border-radius:20px; border:1px solid #ddd; margin-bottom:15px; text-align:center;">
-    <button onclick="join()" style="padding:10px 40px; background:#075e54; color:white; border:none; border-radius:20px;">Join Chat</button>
-</div>
-
-<header>
-    <div class="header-top">
-        <button onclick="clearChat()" class="btn-icon">🗑️</button>
-        <strong>Global Social</strong>
-        <button onclick="document.getElementById('file').click()" class="btn-icon">📷</button>
+    <div class="card">
+        <h2 style="color: #075e54;">Global Social</h2>
+        <form action="/login" method="POST">
+            <img id="preview" class="pfp-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=base" onclick="document.getElementById('file').click()">
+            <input type="file" id="file" hidden accept="image/*" onchange="compressPFP(this)">
+            <input type="hidden" name="pfp_data" id="pfp_data">
+            <input type="text" name="username" placeholder="Choose Username" required>
+            <button type="submit" class="btn">Start Chatting</button>
+        </form>
+        <button class="btn google-btn">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" width="18">
+            Google Login
+        </button>
     </div>
-    <div id="status-bar"></div>
-</header>
 
-<div id="chat"></div>
-
-<div class="input-area">
-    <button id="rec-btn" class="btn-icon">🎤</button>
-    <input type="text" id="msg-in" placeholder="Type message..." oninput="isTyping()" onkeypress="if(event.key==='Enter')send()">
-    <button onclick="send()" class="btn-icon" style="color:#075e54;">➤</button>
-</div>
-
-<script>
-    const socket = io();
-    let myN = localStorage.getItem('un') || "";
-    let myP = localStorage.getItem('up') || "";
-    let typingTimer;
-
-    if(myN) {
-        document.getElementById('login').style.display = 'none';
-        socket.emit('join', {username: myN});
-    }
-
-    function upload(input) {
-        const file = input.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = e => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 150; canvas.height = 150;
-                canvas.getContext('2d').drawImage(img, 0,0,150,150);
-                myP = canvas.toDataURL('image/jpeg', 0.8);
-                document.getElementById('pre').src = myP;
-                localStorage.setItem('up', myP);
+    <script>
+        function compressPFP(input) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 150; canvas.height = 150;
+                    canvas.getContext('2d').drawImage(img, 0, 0, 150, 150);
+                    const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('preview').src = base64;
+                    document.getElementById('pfp_data').value = base64;
+                };
+                img.src = e.target.result;
             };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function join() {
-        const val = document.getElementById('user-in').value.trim();
-        if(val) { 
-            myN = val; localStorage.setItem('un', val); 
-            document.getElementById('login').style.display = 'none';
-            socket.emit('join', {username: myN});
+            reader.readAsDataURL(input.files[0]);
         }
-    }
-
-    function isTyping() {
-        socket.emit('typing', {username: myN, status: true});
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => {
-            socket.emit('typing', {username: myN, status: false});
-        }, 2000);
-    }
-
-    function send() {
-        const input = document.getElementById('msg-in');
-        if(input.value.trim() && myN) {
-            socket.emit('message', {username: myN, message: input.value, profile_pic: myP});
-            input.value = '';
-            socket.emit('typing', {username: myN, status: false});
-        }
-    }
-
-    socket.on('display_typing', d => {
-        const bar = document.getElementById('status-bar');
-        bar.innerText = d.status ? `${d.username} is typing...` : '';
-    });
-
-    socket.on('message', d => {
-        const isMe = d.username === myN;
-        const pic = d.profile_pic || `https://api.dicebear.com/7.x/bottts/svg?seed=${d.username}`;
-        let content = d.audio ? `<audio controls src="${d.audio}"></audio>` : `<span>${d.message}</span>`;
-
-        const html = `
-            <div class="msg ${isMe ? 'me' : ''}">
-                <img src="${pic}" class="pfp">
-                <div class="bubble">
-                    ${!isMe ? `<small style="font-weight:bold; color:#075e54;">${d.username}</small><br>` : ''}
-                    ${content}
-                    <span class="time">${d.time || 'just now'}</span>
-                </div>
-            </div>`;
-        document.getElementById('chat').insertAdjacentHTML('beforeend', html);
-        document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
-    });
-
-    // Recording Logic remains same (omitted for brevity but keep your current working version)
-    // socket.on('reload', () => location.reload());
-</script>
+    </script>
 </body>
 </html>
