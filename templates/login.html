@@ -2,49 +2,21 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join Global Social</title>
+    <title>Login - Global Social</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 300px; }
-        .pfp-preview { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #075e54; cursor: pointer; object-fit: cover; margin-bottom: 15px; }
-        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 25px; box-sizing: border-box; }
-        .btn { background: #075e54; color: white; border: none; padding: 12px 40px; border-radius: 25px; cursor: pointer; font-weight: bold; width: 100%; }
-        .google-btn { background: white; color: #444; border: 1px solid #ddd; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #075e54; }
+        .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; width: 280px; }
+        input { width: 100%; padding: 12px; margin: 20px 0; border: 1px solid #ddd; border-radius: 25px; box-sizing: border-box; outline: none; }
+        button { background: #075e54; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2 style="color: #075e54;">Global Social</h2>
         <form action="/login" method="POST">
-            <img id="preview" class="pfp-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=base" onclick="document.getElementById('file').click()">
-            <input type="file" id="file" hidden accept="image/*" onchange="compressPFP(this)">
-            <input type="hidden" name="pfp_data" id="pfp_data">
-            <input type="text" name="username" placeholder="Choose Username" required>
-            <button type="submit" class="btn">Start Chatting</button>
+            <input type="text" name="username" placeholder="Choose a Username" required>
+            <button type="submit">ENTER CHAT</button>
         </form>
-        <button class="btn google-btn">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" width="18">
-            Google Login
-        </button>
     </div>
-
-    <script>
-        function compressPFP(input) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 150; canvas.height = 150;
-                    canvas.getContext('2d').drawImage(img, 0, 0, 150, 150);
-                    const base64 = canvas.toDataURL('image/jpeg', 0.8);
-                    document.getElementById('preview').src = base64;
-                    document.getElementById('pfp_data').value = base64;
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(input.files[0]);
-        }
-    </script>
 </body>
 </html>

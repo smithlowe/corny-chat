@@ -5,12 +5,11 @@ from flask_socketio import SocketIO, emit
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'super-secret-key-123'
+app.config['SECRET_KEY'] = 'social_simple_v1'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# Buffer set to 50MB to ensure high-quality voice/images go through
 socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=50000000)
 
 class Message(db.Model):
@@ -28,29 +27,18 @@ with app.app_context():
 def index():
     if 'user' not in session:
         return redirect(url_for('login'))
-    return render_template('index.html', username=session['user'], pfp=session.get('pfp', ''))
+    return render_template('index.html', user=session['user'])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # Simply take the name from the form and save it in the session
         session['user'] = request.form.get('username')
-        session['pfp'] = request.form.get('pfp_data')
         return redirect(url_for('index'))
     return render_template('login.html')
 
-@socketio.on('typing')
-def handle_typing(data):
-    # Sends "User is typing..." to everyone except the person typing
-    emit('display_typing', data, broadcast=True, include_self=False)
-
 @socketio.on('message')
 def handle_message(data):
-    if data.get('message') == "/clear_now":
-        Message.query.delete()
-        db.session.commit()
-        emit('reload', broadcast=True)
-        return
-
     now = datetime.now().strftime("%I:%M %p")
     new_msg = Message(
         username=data['username'],
@@ -61,7 +49,6 @@ def handle_message(data):
     )
     db.session.add(new_msg)
     db.session.commit()
-    
     data['time'] = now
     emit('message', data, broadcast=True)
 
