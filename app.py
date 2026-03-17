@@ -9,15 +9,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# max_http_buffer_size allows large files like images and audio (10MB limit)
-socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10000000)
+# Buffer increased to 20MB for higher quality audio
+socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=20000000)
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50))
     message = db.Column(db.Text)
     profile_pic = db.Column(db.Text)
-    audio_data = db.Column(db.Text) # Stores the voice note
+    audio_data = db.Column(db.Text)
 
 with app.app_context():
     db.create_all()

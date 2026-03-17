@@ -17,17 +17,30 @@
         input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
         #login { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .preview { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #075e54; margin-bottom: 15px; cursor: pointer; object-fit: cover; }
-        .btn-icon { background: none; border: none; font-size: 24px; cursor: pointer; padding: 5px; }
-        audio { height: 35px; width: 180px; margin-top: 5px; }
+        .btn-icon { background: none; border: none; font-size: 24px; cursor: pointer; padding: 5px; transition: 0.3s; }
+        
+        /* Recording Animation */
+        .recording-active {
+            animation: pulse 1.5s infinite;
+            color: #ff3b30 !important;
+            transform: scale(1.2);
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+        audio { height: 35px; width: 180px; margin-top: 5px; display: block; }
     </style>
 </head>
 <body>
 
 <div id="login">
-    <img id="pre" class="preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=1" onclick="document.getElementById('file').click()">
+    <h2 style="color: #075e54;">Global Social</h2>
+    <img id="pre" class="preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=welcome" onclick="document.getElementById('file').click()">
     <input type="file" id="file" hidden accept="image/*" onchange="upload(this)">
-    <input type="text" id="user-in" placeholder="Your Name" style="width: 200px; padding: 10px; margin-bottom: 15px; border-radius: 10px; border: 1px solid #ddd;">
-    <button onclick="join()" style="padding: 10px 40px; background: #075e54; color: white; border: none; border-radius: 20px;">Join</button>
+    <input type="text" id="user-in" placeholder="Enter Your Name" style="width: 200px; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: 1px solid #ddd;">
+    <button onclick="join()" style="padding: 12px 50px; background: #075e54; color: white; border: none; border-radius: 25px; font-weight: bold;">JOIN</button>
 </div>
 
 <header>
@@ -40,7 +53,7 @@
 
 <div class="input-area">
     <button id="rec-btn" class="btn-icon">🎤</button>
-    <input type="text" id="msg-in" placeholder="Message" onkeypress="if(event.key==='Enter')send()">
+    <input type="text" id="msg-in" placeholder="Type message..." onkeypress="if(event.key==='Enter')send()">
     <button onclick="send()" class="btn-icon" style="color:#075e54;">➤</button>
 </div>
 
@@ -76,34 +89,43 @@
         }
     }
 
-    // --- Voice Recording Logic ---
     const recBtn = document.getElementById('rec-btn');
     recBtn.onclick = async () => {
         if (!mediaRecorder || mediaRecorder.state === "inactive") {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                // Higher bitrate for better quality
+                mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 128000 });
                 audioChunks = [];
+                
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     const reader = new FileReader();
                     reader.readAsDataURL(audioBlob);
                     reader.onloadend = () => {
-                        socket.emit('message', { username: myN, message: "🎤 Voice Note", audio: reader.result, profile_pic: myP });
+                        socket.emit('message', { 
+                            username: myN, 
+                            message: "🎤 Voice Note", 
+                            audio: reader.result, 
+                            profile_pic: myP 
+                        });
                     };
                 };
+
                 mediaRecorder.start();
-                recBtn.style.color = "red";
-            } catch (err) { alert("Microphone access denied."); }
+                recBtn.classList.add('recording-active');
+                recBtn.innerText = "🛑"; 
+            } catch (err) { alert("Enable microphone permissions!"); }
         } else {
             mediaRecorder.stop();
-            recBtn.style.color = "#075e54";
+            recBtn.classList.remove('recording-active');
+            recBtn.innerText = "🎤";
         }
     };
 
     function clearChat() {
-        if(confirm("Wipe chat?")) socket.emit('message', {message: "/clear_now"});
+        if(confirm("Wipe chat history?")) socket.emit('message', {message: "/clear_now"});
     }
 
     socket.on('message', d => {
