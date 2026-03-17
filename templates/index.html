@@ -7,7 +7,8 @@
     <style>
         body { font-family: 'Comic Sans MS', cursive, sans-serif; background: #fff9c4; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { background: white; padding: 10px 15px; border-radius: 20px; border: 2px solid #fbc02d; max-width: 80%; word-wrap: break-word; align-self: flex-start; }
+        .msg { background: white; padding: 10px 15px; border-radius: 20px; border: 2px solid #fbc02d; max-width: 85%; word-wrap: break-word; align-self: flex-start; position: relative; }
+        .time { font-size: 9px; color: #888; margin-left: 8px; vertical-align: bottom; }
         .controls { padding: 15px; background: #fbc02d; display: flex; gap: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
         input { padding: 10px; border-radius: 20px; border: 2px solid #f9a825; outline: none; }
         button { background: #e65100; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
@@ -17,7 +18,10 @@
 
     <div id="chat">
         {% for m in history %}
-            <div class="msg"><b>{{ m.user }}:</b> {{ m.text }}</div>
+            <div class="msg">
+                <b>{{ m.user }}:</b> {{ m.text }}
+                <span class="time">{{ m.timestamp.strftime('%I:%M %p') }}</span>
+            </div>
         {% endfor %}
     </div>
 
@@ -30,7 +34,7 @@
     <script>
         const socket = io();
 
-        // Auto-scroll to bottom on page load so you see the latest messages
+        // Auto-scroll to bottom on load
         window.onload = () => {
             const chat = document.getElementById('chat');
             chat.scrollTop = chat.scrollHeight;
@@ -45,11 +49,15 @@
             }
         }
 
+        // STEP 2: Display New Messages with Live Timestamps
         socket.on('message', d => {
             const chat = document.getElementById('chat');
             const div = document.createElement('div');
             div.className = 'msg';
-            div.innerHTML = `<b>${d.user}:</b> ${d.text}`;
+            
+            // We use d.time which comes from the server in app.py
+            div.innerHTML = `<b>${d.user}:</b> ${d.text} <span class="time">${d.time}</span>`;
+            
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         });
