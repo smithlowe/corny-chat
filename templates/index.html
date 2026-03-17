@@ -1,20 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Corny Chat 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body { font-family: 'Comic Sans MS', cursive, sans-serif; background: #fff9c4; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { background: white; padding: 10px 15px; border-radius: 20px; border: 2px solid #fbc02d; max-width: 85%; word-wrap: break-word; align-self: flex-start; position: relative; }
-        .time { font-size: 9px; color: #888; margin-left: 8px; vertical-align: bottom; }
-        .controls { padding: 15px; background: #fbc02d; display: flex; gap: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
-        input { padding: 10px; border-radius: 20px; border: 2px solid #f9a825; outline: none; }
-        button { background: #e65100; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        #status-bar { background: #e65100; color: white; padding: 8px 15px; font-size: 13px; display: flex; justify-content: space-between; font-weight: bold; }
+        #chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { background: white; padding: 8px 12px; border-radius: 15px; border: 2px solid #fbc02d; max-width: 85%; align-self: flex-start; }
+        .time { font-size: 9px; color: #999; margin-left: 6px; }
+        .controls { padding: 15px; background: #fbc02d; display: flex; gap: 10px; }
+        input { padding: 10px; border-radius: 20px; border: none; outline: none; flex: 1; }
+        button { background: #e65100; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
+
+    <div id="status-bar">
+        <span>Corny Chat 🌽</span>
+        <span id="online-count">Online: 0</span>
+    </div>
 
     <div id="chat">
         {% for m in history %}
@@ -26,50 +32,37 @@
     </div>
 
     <div class="controls">
-        <input type="text" id="user" placeholder="Name" style="width: 80px;">
-        <input type="text" id="msg" placeholder="Type something corny..." style="flex: 1;" onkeypress="if(event.key==='Enter') send()">
-        <button onclick="send()">Send 🌽</button>
+        <input type="text" id="user" placeholder="Name" style="width: 70px;">
+        <input type="text" id="msg" placeholder="Type a message..." onkeypress="if(event.key==='Enter') send()">
+        <button onclick="send()">Send</button>
     </div>
 
     <script>
         const socket = io();
+        const chat = document.getElementById('chat');
 
-        // Auto-scroll to bottom on load
-        window.onload = () => {
-            const chat = document.getElementById('chat');
-            chat.scrollTop = chat.scrollHeight;
-        };
+        window.onload = () => chat.scrollTop = chat.scrollHeight;
 
         function send() {
-            const u = document.getElementById('user').value || "Anonymous";
+            const u = document.getElementById('user').value || "Anon";
             const m = document.getElementById('msg').value;
-            if (m.trim() !== "") {
+            if (m.trim()) {
                 socket.emit('message', { user: u, text: m });
                 document.getElementById('msg').value = '';
             }
         }
 
-        // STEP 2: Display New Messages with Live Timestamps
         socket.on('message', d => {
-            const chat = document.getElementById('chat');
             const div = document.createElement('div');
             div.className = 'msg';
-            
-            // We use d.time which comes from the server in app.py
             div.innerHTML = `<b>${d.user}:</b> ${d.text} <span class="time">${d.time}</span>`;
-            
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
+        });
+
+        socket.on('user_count', d => {
+            document.getElementById('online-count').innerText = `Online: ${d.count}`;
         });
     </script>
 </body>
 </html>
-<div style="background: #e65100; color: white; padding: 5px 15px; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
-    <span>Corny Chat 🌽</span>
-    <span id="online-count">Online: 1</span>
-</div>
-
-// Listen for the 'user_count' signal from the server
-socket.on('user_count', d => {
-    document.getElementById('online-count').innerText = `Online: ${d.count}`;
-});
