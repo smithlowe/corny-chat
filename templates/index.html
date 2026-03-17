@@ -1,26 +1,37 @@
-// Add these parts inside your existing <script> in index.html
-
-let typingTimer;
-const msgInput = document.getElementById('msg-in');
-
-// 1. Send "Typing" signal
-msgInput.oninput = () => {
-    socket.emit('typing', { username: myN, status: true });
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => {
-        socket.emit('typing', { username: myN, status: false });
-    }, 2000);
-};
-
-// 2. Listen for "Typing" signal
-socket.on('display_typing', d => {
-    const bar = document.getElementById('status-bar');
-    bar.innerText = d.status ? `${d.username} is typing...` : '';
-});
-
-// 3. Updated Message Display (inside socket.on('message'))
 socket.on('message', d => {
-    // ... same as before but add this span inside the bubble
-    const timeHTML = `<span style="font-size:9px; color:#999; display:block; text-align:right;">${d.time} ✔✔</span>`;
-    // Add timeHTML to your bubble content
+    // 1. Identify who sent it
+    const isMe = d.username === myN;
+    
+    // 2. Handle Profile Picture (Use robot if empty)
+    const pic = d.profile_pic || `https://api.dicebear.com/7.x/bottts/svg?seed=${d.username}`;
+    
+    // 3. Handle Content (Text or Audio)
+    let content = `<span>${d.message}</span>`;
+    if(d.audio) {
+        content = `<audio controls src="${d.audio}"></audio>`;
+    }
+
+    // 4. Create the HTML Bubble
+    const html = `
+        <div class="msg ${isMe ? 'me' : ''}" data-id="${d.id}">
+            <img src="${pic}" class="pfp">
+            <div class="bubble">
+                ${!isMe ? `<small style="font-weight:bold; color:#075e54; display:block; margin-bottom:2px;">${d.username}</small>` : ''}
+                ${content}
+                <div style="display: flex; justify-content: flex-end; align-items: center; gap: 3px; margin-top: 4px;">
+                    <span style="font-size:9px; color:#999;">${d.time}</span>
+                    <span class="ticks" style="font-size:10px; color:#999;">${isMe ? '✔' : ''}</span>
+                </div>
+            </div>
+        </div>`;
+
+    // 5. Inject into Chat and Scroll
+    const chatBox = document.getElementById('chat');
+    chatBox.insertAdjacentHTML('beforeend', html);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    // 6. Mark as read if it's from someone else
+    if (!isMe) {
+        socket.emit('mark_read', { msg_id: d.id });
+    }
 });
