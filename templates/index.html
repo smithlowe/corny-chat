@@ -6,7 +6,7 @@
     <title>Corny Chat Pro 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: 'Segoe UI', sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         #main-chat { display: none; width: 100%; max-width: 500px; flex-direction: column; height: 92vh; }
         #chat-box { flex: 1; border: 1px solid #ddd; margin: 10px 0; overflow-y: auto; background: white; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
@@ -23,7 +23,7 @@
         button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; }
         #record-btn.recording { background: #ff4444 !important; color: white !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        audio { width: 180px; height: 35px; margin-top: 5px; border-radius: 10px; }
+        audio { width: 180px; height: 35px; margin-top: 5px; }
         .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; border: none; }
     </style>
 </head>
@@ -53,135 +53,129 @@
         </div>
     </div>
 
-   <script>
-    const socket = io({ transports: ["websocket", "polling"] });
-    const chatBox = document.getElementById('chat-box');
-    const loginScreen = document.getElementById('login-screen');
-    const mainChat = document.getElementById('main-chat');
-    const typingStatus = document.getElementById('typing-status');
-    const recordBtn = document.getElementById('record-btn');
-    let myName = localStorage.getItem('corny_name');
-    let typeTimer, mediaRecorder, chunks = [];
+    <script>
+        const socket = io({ transports: ["websocket", "polling"] });
+        const chatBox = document.getElementById('chat-box');
+        const loginScreen = document.getElementById('login-screen');
+        const mainChat = document.getElementById('main-chat');
+        const typingStatus = document.getElementById('typing-status');
+        const recordBtn = document.getElementById('record-btn');
+        let myName = localStorage.getItem('corny_name');
+        let typeTimer, mediaRecorder, chunks = [];
 
-    // 1. UPDATED LOAD LOGIC (The "Quiet" Fix)
-window.onload = () => {
-        const savedHistory = localStorage.getItem('chat_history');
-        if (savedHistory) {
-            chatBox.innerHTML = savedHistory;
+        window.onload = () => {
+            const savedHistory = localStorage.getItem('chat_history');
+            if (savedHistory) {
+                chatBox.innerHTML = savedHistory;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+            if (myName) {
+                loginScreen.style.display = 'none';
+                mainChat.style.display = 'flex';
+                
+                // Silent resync if already announced, otherwise join fresh
+                if (sessionStorage.getItem('announced_presence')) {
+                    socket.emit('resync_user', { name: myName });
+                } else {
+                    socket.emit('user_joined', { name: myName });
+                    sessionStorage.setItem('announced_presence', 'true');
+                }
+            }
+        };
+
+        socket.on('user_count', (data) => {
+            document.getElementById('user-count').innerText = data.count;
+        });
+
+        function addEmoji(emoji) { document.getElementById('msg-input').value += emoji; document.getElementById('msg-input').focus(); }
+
+        function broadcastTyping() {
+            socket.emit('typing', { user: myName, isTyping: true });
+            clearTimeout(typeTimer);
+            typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
+        }
+
+        socket.on('display_typing', (data) => {
+            typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
+        });
+
+        function sendText() {
+            const input = document.getElementById('msg-input');
+            if (input.value.trim()) {
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                socket.emit('message', { content: input.value, user: myName, time: timeStr });
+                input.value = '';
+                socket.emit('typing', { user: myName, isTyping: false });
+            }
+        }
+
+        socket.on('render_msg', (data) => {
+            const div = document.createElement('div');
+            if (data.user === 'System') {
+                div.className = 'message system-msg';
+                div.innerText = data.content;
+            } else {
+                const isMe = data.user === myName;
+                div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
+                const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
+                if (data.type === 'text') {
+                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${data.time}</span>`;
+                } else {
+                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${data.time}</span>`;
+                }
+            }
+            chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
-        }
-        
-        if (myName) {
-            loginScreen.style.display = 'none';
-            mainChat.style.display = 'flex';
-            
-            // If we already announced, just "silently" reconnect to update the count
-            if (sessionStorage.getItem('announced_presence')) {
-                socket.emit('resync_user', { name: myName });
-            } else {
-                socket.emit('user_joined', { name: myName });
-                sessionStorage.setItem('announced_presence', 'true');
-            }
-        }
-    };
-    socket.on('user_count', (data) => {
-        document.getElementById('user-count').innerText = data.count;
-    });
+            localStorage.setItem('chat_history', chatBox.innerHTML);
+        });
 
-    function addEmoji(emoji) { 
-        const input = document.getElementById('msg-input');
-        input.value += emoji; 
-        input.focus(); 
-    }
-
-    function broadcastTyping() {
-        socket.emit('typing', { user: myName, isTyping: true });
-        clearTimeout(typeTimer);
-        typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
-    }
-
-    socket.on('display_typing', (data) => {
-        typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
-    });
-
-    function sendText() {
-        const input = document.getElementById('msg-input');
-        if (input.value.trim()) {
-            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            socket.emit('message', { content: input.value, user: myName, time: timeStr });
-            input.value = '';
-            socket.emit('typing', { user: myName, isTyping: false });
-        }
-    }
-
-    socket.on('render_msg', (data) => {
-        const div = document.createElement('div');
-        if (data.user === 'System') {
-            div.className = 'message system-msg';
-            div.innerText = data.content;
-        } else {
-            const isMe = data.user === myName;
-            div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
-            const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
-            const displayTime = data.time || "Just now";
-            
-            if (data.type === 'text') {
-                div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${displayTime}</span>`;
-            } else {
-                div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${displayTime}</span>`;
-            }
-        }
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        localStorage.setItem('chat_history', chatBox.innerHTML);
-    });
-
-    async function startRecording() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            chunks = [];
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                const reader = new FileReader();
-                reader.readAsDataURL(blob);
-                reader.onloadend = () => {
-                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                   socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
+                    };
                 };
-            };
-            mediaRecorder.start();
-            recordBtn.classList.add('recording');
-        } catch (err) { alert("Enable Microphone Access!"); }
-    } 
-
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
-        recordBtn.classList.remove('recording');
-    }
-
-    recordBtn.addEventListener('mousedown', startRecording);
-    recordBtn.addEventListener('mouseup', stopRecording);
-    recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
-    recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
-
-    function joinChat() {
-        const val = document.getElementById('username-input').value.trim();
-        if (val) {
-            myName = val;
-            localStorage.setItem('corny_name', val);
-            sessionStorage.setItem('announced_presence', 'true');
-            loginScreen.style.display = 'none';
-            mainChat.style.display = 'flex';
-            socket.emit('user_joined', { name: val });
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+            } catch (err) { alert("Mic blocked!"); }
         }
-    }
 
-    function logout() { 
-        localStorage.clear(); 
-        sessionStorage.clear();
-        location.reload(); 
-    }
-</script></body>
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+            recordBtn.classList.remove('recording');
+        }
+
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+        recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+        function joinChat() {
+            const val = document.getElementById('username-input').value.trim();
+            if (val) {
+                myName = val;
+                localStorage.setItem('corny_name', val);
+                sessionStorage.setItem('announced_presence', 'true');
+                loginScreen.style.display = 'none';
+                mainChat.style.display = 'flex';
+                socket.emit('user_joined', { name: val });
+            }
+        }
+
+        function logout() { 
+            localStorage.clear(); 
+            sessionStorage.clear();
+            location.reload(); 
+        }
+    </script>
+</body>
 </html>

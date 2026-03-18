@@ -14,24 +14,25 @@ def index():
 
 @socketio.on('connect')
 def handle_connect():
-    # We don't increment yet, we wait for 'user_joined' to get their name
+    # Connection established; we wait for joined or resync to count them
     pass
 
 @socketio.on('user_joined')
 def handle_user_joined(data):
     # Map this specific connection ID to the username
     active_users[request.sid] = data['name']
-    @socketio.on('resync_user')
-def handle_resync(data):
-    # Just add them to the active list without broadcasting a "Joined" message
-    active_users[request.sid] = data['name']
-    # Update the count for everyone
-    emit('user_count', {'count': len(active_users)}, broadcast=True)
     
-    # Broadcast join message
+    # Broadcast join message to everyone
     emit('render_msg', {'user': 'System', 'content': f"🌽 {data['name']} joined the field!"}, broadcast=True)
     
     # Send the NEW total count to everyone
+    emit('user_count', {'count': len(active_users)}, broadcast=True)
+
+@socketio.on('resync_user')
+def handle_resync(data):
+    # Add them to the active list SILENTLY (no "Joined" message)
+    active_users[request.sid] = data['name']
+    # Update the count for everyone so it doesn't stay at 0
     emit('user_count', {'count': len(active_users)}, broadcast=True)
 
 @socketio.on('message')
@@ -58,7 +59,7 @@ def handle_typing(data):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    # Remove the user from our tracker
+    # Remove the user from our tracker when they leave or close the tab
     if request.sid in active_users:
         del active_users[request.sid]
     
