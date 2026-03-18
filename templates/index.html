@@ -1,67 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Corny Chat 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Comic Sans MS', cursive, sans-serif; background: #fff9c4; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        #status-bar { background: #e65100; color: white; padding: 8px 15px; font-size: 13px; display: flex; justify-content: space-between; font-weight: bold; }
-        #chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
-        .msg { background: white; padding: 8px 12px; border-radius: 15px; border: 2px solid #fbc02d; max-width: 85%; align-self: flex-start; }
-        .time { font-size: 9px; color: #999; margin-left: 6px; }
-        .controls { padding: 15px; background: #fbc02d; display: flex; gap: 10px; }
-        input { padding: 10px; border-radius: 20px; border: none; outline: none; flex: 1; }
-        button { background: #e65100; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fffef0; display: flex; flex-direction: column; align-items: center; }
+        #chat-box { width: 90%; max-width: 500px; height: 400px; border: 2px solid #ffd700; background: white; overflow-y: scroll; padding: 15px; margin-bottom: 10px; border-radius: 10px; }
+        .controls { display: flex; gap: 10px; width: 90%; max-width: 500px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+        #send-btn { background-color: #ffd700; color: #333; }
+        #record-btn { background-color: #ff4444; color: white; transition: 0.3s; }
+        #record-btn.recording { background-color: #990000; transform: scale(0.95); }
+        .message { margin-bottom: 15px; padding: 8px; border-radius: 5px; background: #f9f9f9; }
+        audio { display: block; margin-top: 5px; max-width: 100%; }
     </style>
 </head>
 <body>
 
-    <div id="status-bar">
-        <span>Corny Chat 🌽</span>
-        <span id="online-count">Online: 0</span>
-    </div>
+    <h1>Corny Chat 🌽</h1>
 
-    <div id="chat">
-        {% for m in history %}
-            <div class="msg">
-                <b>{{ m.user }}:</b> {{ m.text }}
-                <span class="time">{{ m.timestamp.strftime('%I:%M %p') }}</span>
-            </div>
-        {% endfor %}
-    </div>
+    <div id="chat-box">
+        </div>
 
     <div class="controls">
-        <input type="text" id="user" placeholder="Name" style="width: 70px;">
-        <input type="text" id="msg" placeholder="Type a message..." onkeypress="if(event.key==='Enter') send()">
-        <button onclick="send()">Send</button>
+        <input type="text" id="msg-input" placeholder="Type a message...">
+        <button id="send-btn">Send 🌽</button>
+        <button id="record-btn">🎤 Hold to Record</button>
     </div>
 
     <script>
         const socket = io();
-        const chat = document.getElementById('chat');
+        const chatBox = document.getElementById('chat-box');
+        const msgInput = document.getElementById('msg-input');
+        const sendBtn = document.getElementById('send-btn');
+        const recordBtn = document.getElementById('record-btn');
 
-        window.onload = () => chat.scrollTop = chat.scrollHeight;
+        let mediaRecorder;
+        let audioChunks = [];
 
-        function send() {
-            const u = document.getElementById('user').value || "Anon";
-            const m = document.getElementById('msg').value;
-            if (m.trim()) {
-                socket.emit('message', { user: u, text: m });
-                document.getElementById('msg').value = '';
+        // --- TEXT MESSAGE LOGIC ---
+        sendBtn.onclick = () => {
+            if (msgInput.value) {
+                socket.emit('message', { type: 'text', content: msgInput.value });
+                msgInput.value = '';
             }
-        }
+        };
 
-        socket.on('message', d => {
+        // --- VOICE NOTE LOGIC ---
+        recordBtn.onmousedown = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        socket.emit('voice_note', { audio: reader.result });
+                    };
+                };
+
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+                recordBtn.innerText = "Recording...";
+            } catch (err) {
+                alert("Microphone access denied!");
+            }
+        };
+
+        recordBtn.onmouseup = () => {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+                recordBtn.innerText = "🎤 Hold to Record";
+            }
+        };
+
+        // --- RECEIVING MESSAGES ---
+        socket.on('render_msg', (data) => {
             const div = document.createElement('div');
-            div.className = 'msg';
-            div.innerHTML = `<b>${d.user}:</b> ${d.text} <span class="time">${d.time}</span>`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-        });
-
-        socket.on('user_count', d => {
-            document.getElementById('online-count').innerText = `Online: ${d.count}`;
+            div.className = 'message';
+            
+            if (data.type === 'text') {
+                div.innerHTML = `<strong>User:</strong> ${data.content}`;
+            } else if (data.type === 'voice') {
+                div.innerHTML = `<strong>User:</strong>`;
+                const audio = document.createElement('audio');
+                audio.src = data.content;
+                audio.controls = true;
+                div.appendChild(audio);
+            }
+            
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
         });
     </script>
 </body>
