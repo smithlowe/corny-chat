@@ -20,13 +20,11 @@
         .emoji-bar { display: flex; gap: 12px; margin: 5px 0; padding-left: 5px; font-size: 22px; cursor: pointer; }
         .controls { display: flex; gap: 8px; width: 100%; align-items: center; }
         input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
-        button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; user-select: none; }
-        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; }
-        
-        /* The Pulsing Red Record Light */
+        button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; }
         #record-btn.recording { background: #ff4444 !important; color: white !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        audio { width: 180px; height: 35px; margin-top: 5px; border-radius: 10px; }
+        audio { width: 180px; height: 35px; margin-top: 5px; }
+        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -45,10 +43,8 @@
         <div id="chat-box"></div>
         <div id="typing-status"></div>
         <div class="emoji-bar">
-            <span onclick="addEmoji('🌽')">🌽</span>
-            <span onclick="addEmoji('❤️')">❤️</span>
-            <span onclick="addEmoji('😂')">😂</span>
-            <span onclick="addEmoji('🔥')">🔥</span>
+            <span onclick="addEmoji('🌽')">🌽</span><span onclick="addEmoji('❤️')">❤️</span>
+            <span onclick="addEmoji('😂')">😂</span><span onclick="addEmoji('🔥')">🔥</span>
         </div>
         <div class="controls">
             <input type="text" id="msg-input" placeholder="Message..." oninput="broadcastTyping()" onkeypress="if(event.key==='Enter')sendText()">
@@ -65,23 +61,21 @@
         const typingStatus = document.getElementById('typing-status');
         const recordBtn = document.getElementById('record-btn');
         let myName = localStorage.getItem('corny_name');
-        let typeTimer;
-        let mediaRecorder;
-        let chunks = [];
+        let typeTimer, mediaRecorder, chunks = [];
 
-        // 1. Fixed "Joined" Logic
+        // UI Initialization
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
-            // Only announce once per session (prevents spam on refresh)
-            if (!sessionStorage.getItem('has_announced')) {
-                socket.emit('user_joined', { name: myName });
-                sessionStorage.setItem('has_announced', 'true');
-            }
+            socket.emit('user_joined', { name: myName });
         }
 
-        const savedHistory = localStorage.getItem('chat_history');
-        if (savedHistory) { chatBox.innerHTML = savedHistory; chatBox.scrollTop = chatBox.scrollHeight; }
+        // Logic for Online Counter
+        socket.on('user_count', (data) => {
+            document.getElementById('user-count').innerText = data.count;
+        });
+
+        function addEmoji(emoji) { document.getElementById('msg-input').value += emoji; document.getElementById('msg-input').focus(); }
 
         function broadcastTyping() {
             socket.emit('typing', { user: myName, isTyping: true });
@@ -92,11 +86,6 @@
         socket.on('display_typing', (data) => {
             typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
         });
-
-        function addEmoji(emoji) {
-            document.getElementById('msg-input').value += emoji;
-            document.getElementById('msg-input').focus();
-        }
 
         function sendText() {
             const input = document.getElementById('msg-input');
@@ -116,21 +105,17 @@
             } else {
                 const isMe = data.user === myName;
                 div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
-                const displayTime = data.time || "Just now";
                 const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
-                
                 if (data.type === 'text') {
-                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${displayTime}</span>`;
+                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${data.time}</span>`;
                 } else {
-                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${displayTime}</span>`;
+                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${data.time}</span>`;
                 }
             }
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
-            localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
-        // 2. STURDY Voice Recording Fix
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -148,20 +133,16 @@
                 };
                 mediaRecorder.start();
                 recordBtn.classList.add('recording');
-            } catch (err) { alert("Enable Microphone Access!"); }
+            } catch (err) { alert("Mic blocked!"); }
         }
 
         function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
             recordBtn.classList.remove('recording');
         }
 
-        // Support both mouse and touch (for mobile)
         recordBtn.addEventListener('mousedown', startRecording);
         recordBtn.addEventListener('mouseup', stopRecording);
-        recordBtn.addEventListener('mouseleave', stopRecording); // If mouse slides off button
         recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
         recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 
@@ -170,15 +151,13 @@
             if (val) {
                 myName = val;
                 localStorage.setItem('corny_name', val);
-                sessionStorage.setItem('has_announced', 'true');
                 loginScreen.style.display = 'none';
                 mainChat.style.display = 'flex';
                 socket.emit('user_joined', { name: val });
             }
         }
 
-        function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
-        socket.on('user_count', (data) => { document.getElementById('user-count').innerText = data.count; });
+        function logout() { localStorage.clear(); location.reload(); }
     </script>
 </body>
 </html>
