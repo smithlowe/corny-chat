@@ -10,7 +10,7 @@
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         #main-chat { display: none; width: 100%; max-width: 1200px; height: 95vh; flex-direction: row; gap: 15px; }
         #doctor-sidebar { width: 280px; background: #fff; border-radius: 20px; border: 1px solid #eee; padding: 20px; flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,0.05); display: none; }
-        #patient-list button { padding: 12px; border-radius: 12px; border: 1px solid #f0f0f0; background: #fdfdfd; cursor: pointer; text-align: left; transition: all 0.3s ease; font-weight: 500; color: #444; }
+        #patient-list button { padding: 12px; border-radius: 12px; border: 1px solid #f0f0f0; background: #fdfdfd; cursor: pointer; text-align: left; transition: all 0.3s ease; font-weight: 500; color: #444; margin-bottom: 10px; width: 100%; }
         #patient-list button:hover { background: #ffd700 !important; border-color: #ffd700; transform: translateX(5px); }
         #patient-list button.active-chat { background: #ffd700 !important; font-weight: bold; border-color: #ccac00; }
         #chat-container { flex: 1; display: flex; flex-direction: column; background: transparent; }
@@ -36,7 +36,7 @@
 <div id="login-screen">
     <h1 style="font-size: 2.5rem; color: #333;">Corny-Comm Medical 🏥</h1>
     <p style="color: #666; margin-bottom: 20px;">Secure Consultations for Ugandan Medics</p>
-    <input type="text" id="username-input" placeholder="Your Full Name..." style="width: 250px;">
+    <input type="text" id="username-input" placeholder="Your Full Name...">
     <select id="role-input" style="margin-top:10px; padding:12px; border-radius:25px; width:275px; border: 1px solid #ccc;">
         <option value="Patient">I am a Patient</option>
         <option value="Doctor">I am a Doctor/Medic</option>
@@ -73,6 +73,7 @@
     </div>
 </div>
 
+
 <script>
     const socket = io({ transports: ["websocket", "polling"] });
     const chatBox = document.getElementById('chat-box');
@@ -83,43 +84,49 @@
     
     let myName = localStorage.getItem('corny_name');
     let myRole = localStorage.getItem('corny_role') || 'Patient';
+    let isActive = localStorage.getItem('is_active'); 
     let currentTargetSid = null; 
     let typeTimer, mediaRecorder, chunks = [];
 
     window.onload = () => {
+        // 🛡️ BLOCK MULTIPLE TABS
+        if (isActive === 'true' && !sessionStorage.getItem('tab_initialized')) {
+            document.body.innerHTML = `
+                <div style="text-align:center; margin-top:100px; font-family:sans-serif;">
+                    <h1 style="color:#ff4444;">⚠️ Active Session Found</h1>
+                    <p>You are already logged into Corny-Comm Medical in another tab.</p>
+                    <button onclick="location.reload()" class="action-btn" style="background:#ffd700; padding:10px 20px; border-radius:20px; border:none; cursor:pointer;">Retry</button>
+                </div>`;
+            return;
+        }
+
         const savedHistory = localStorage.getItem('chat_history');
         if (savedHistory) {
             chatBox.innerHTML = savedHistory;
             chatBox.scrollTop = chatBox.scrollHeight;
         }
+        
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
+            sessionStorage.setItem('tab_initialized', 'true');
+            localStorage.setItem('is_active', 'true'); 
             if (myRole === 'Doctor') document.getElementById('doctor-sidebar').style.display = 'flex';
             socket.emit('user_joined', { name: myName, role: myRole });
         }
     };
 
-   socket.on('user_count', (data) => {
+    socket.on('user_count', (data) => {
         document.getElementById('user-count').innerText = data.count;
-        
-        // 🚀 UPDATED: Only run this if I am a Doctor
         if (myRole === 'Doctor' && data.users_list) {
             const listDiv = document.getElementById('patient-list');
             listDiv.innerHTML = ''; 
-            
             data.users_list.forEach(user => {
-                // 🏥 DOCTOR LOGIC: 
-                // Don't show myself in my own list, but show everyone else
                 if (user.name !== myName) {
                     const btn = document.createElement('button');
-                    
-                    // Add a special tag if the other person is also a Doctor
                     const roleTag = user.role === 'Doctor' ? '👨‍⚕️ Staff' : '👤 Patient';
-                    btn.innerHTML = `<b>${roleTag}: ${user.name}</b><br><small>${user.role === 'Doctor' ? 'Colleague' : 'Ready for consultation'}</small>`;
-                    
+                    btn.innerHTML = `<b>${roleTag}: ${user.name}</b><br><small>${user.role === 'Doctor' ? 'Colleague' : 'Ready'}</small>`;
                     if(user.sid === currentTargetSid) btn.className = 'active-chat';
-
                     btn.onclick = () => {
                         currentTargetSid = user.sid;
                         document.getElementById('chat-header').innerText = `💬 Chatting with: ${user.name}`;
@@ -131,6 +138,7 @@
             });
         }
     });
+
     function addEmoji(emoji) { 
         const input = document.getElementById('msg-input');
         input.value += emoji; 
@@ -184,14 +192,24 @@
         const nameVal = document.getElementById('username-input').value.trim();
         const roleVal = document.getElementById('role-input').value;
         if (nameVal) {
-            myName = nameVal; myRole = roleVal;
             localStorage.setItem('corny_name', nameVal);
             localStorage.setItem('corny_role', roleVal);
+            localStorage.setItem('is_active', 'true');
+            sessionStorage.setItem('tab_initialized', 'true');
+            myName = nameVal; myRole = roleVal;
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
             if (roleVal === 'Doctor') document.getElementById('doctor-sidebar').style.display = 'flex';
             socket.emit('user_joined', { name: nameVal, role: roleVal });
         }
+    }
+
+    function logout() { 
+        localStorage.removeItem('is_active');
+        localStorage.removeItem('corny_name');
+        localStorage.removeItem('corny_role');
+        sessionStorage.clear();
+        location.reload(); 
     }
 
     async function startRecording() {
@@ -213,18 +231,12 @@
             recordBtn.classList.add('recording');
         } catch (err) { alert("Mic blocked!"); }
     }
-
     function stopRecording() {
         if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
         recordBtn.classList.remove('recording');
     }
-
     recordBtn.addEventListener('mousedown', startRecording);
     recordBtn.addEventListener('mouseup', stopRecording);
     recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
     recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
-
-    function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
 </script>
-</body>
-</html>
