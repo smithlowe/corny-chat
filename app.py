@@ -59,13 +59,29 @@ def handle_resync(data):
 
 @socketio.on('message')
 def handle_message(data):
-    emit('render_msg', {
-        'user': data['user'], 
-        'content': data['content'], 
-        'time': data['time'],
-        'type': 'text'
-    }, broadcast=True)
+    sender_sid = request.sid
+    sender_info = active_users.get(sender_sid, {})
+    sender_role = sender_info.get('role', 'Patient')
+    sender_name = sender_info.get('name', 'Unknown')
 
+    # Create the message packet
+    message_packet = {
+        'user': sender_name,
+        'content': data['content'],
+        'time': data['time'],
+        'type': 'text',
+        'sender_role': sender_role,
+        'target': data.get('target', 'All') # We will use this for private routing
+    }
+
+    if sender_role == 'Doctor':
+        # Doctors are public - everyone needs to hear the Medic!
+        emit('render_msg', message_packet, broadcast=True)
+    else:
+        # Patients are private - only the Doctor and the Sender should see this
+        for sid, info in active_users.items():
+            if info.get('role') == 'Doctor' or sid == sender_sid:
+                emit('render_msg', message_packet, room=sid)
 @socketio.on('voice_note')
 def handle_voice(data):
     emit('render_msg', {

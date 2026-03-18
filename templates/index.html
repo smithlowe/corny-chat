@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Corny Chat Pro 🌽</title>
+    <title>Corny-Comm Medical 🏥</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
@@ -29,165 +29,170 @@
 </head>
 <body>
 
-    <div id="login-screen">
+<div id="login-screen">
     <h1>Corny-Comm Medical 🏥</h1>
     <input type="text" id="username-input" placeholder="Your Full Name...">
-    
     <select id="role-input" style="margin-top:10px; padding:10px; border-radius:25px; width:220px;">
         <option value="Patient">I am a Patient</option>
         <option value="Doctor">I am a Doctor/Medic</option>
     </select>
-
     <button onclick="joinChat()" style="margin-top:15px; width: 220px;">Start Consultation</button>
 </div>
 
-    <div id="main-chat">
-        <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
-            <span style="color: #666; font-weight: bold;">🌽 Online: <span id="user-count">0</span></span>
-            <button class="logout-btn" onclick="logout()">Logout</button>
-        </div>
-        <div id="chat-box"></div>
-        <div id="typing-status"></div>
-        <div class="emoji-bar">
-            <span onclick="addEmoji('🌽')">🌽</span><span onclick="addEmoji('❤️')">❤️</span>
-            <span onclick="addEmoji('😂')">😂</span><span onclick="addEmoji('🔥')">🔥</span>
-        </div>
-        <div class="controls">
-            <input type="text" id="msg-input" placeholder="Message..." oninput="broadcastTyping()" onkeypress="if(event.key==='Enter')sendText()">
-            <button onclick="sendText()">Send</button>
-            <button id="record-btn">🎤</button>
-        </div>
+<div id="main-chat">
+    <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
+        <span style="color: #666; font-weight: bold;">🌽 Online: <span id="user-count">0</span></span>
+        <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
+    <div id="chat-box"></div>
+    <div id="typing-status"></div>
+    <div class="emoji-bar">
+        <span onclick="addEmoji('🌽')">🌽</span><span onclick="addEmoji('❤️')">❤️</span>
+        <span onclick="addEmoji('😂')">😂</span><span onclick="addEmoji('🔥')">🔥</span>
+    </div>
+    <div class="controls">
+        <input type="text" id="msg-input" placeholder="Message..." oninput="broadcastTyping()" onkeypress="if(event.key==='Enter')sendText()">
+        <button onclick="sendText()">Send</button>
+        <button id="record-btn">🎤</button>
+    </div>
+</div>
 
-    <script>
-        const socket = io({ transports: ["websocket", "polling"] });
-        const chatBox = document.getElementById('chat-box');
-        const loginScreen = document.getElementById('login-screen');
-        const mainChat = document.getElementById('main-chat');
-        const typingStatus = document.getElementById('typing-status');
-        const recordBtn = document.getElementById('record-btn');
-        let myName = localStorage.getItem('corny_name');
-        let typeTimer, mediaRecorder, chunks = [];
+<script>
+    const socket = io({ transports: ["websocket", "polling"] });
+    const chatBox = document.getElementById('chat-box');
+    const loginScreen = document.getElementById('login-screen');
+    const mainChat = document.getElementById('main-chat');
+    const typingStatus = document.getElementById('typing-status');
+    const recordBtn = document.getElementById('record-btn');
+    let myName = localStorage.getItem('corny_name');
+    let myRole = localStorage.getItem('corny_role') || 'Patient';
+    let typeTimer, mediaRecorder, chunks = [];
 
-        window.onload = () => {
-            const savedHistory = localStorage.getItem('chat_history');
-            if (savedHistory) {
-                chatBox.innerHTML = savedHistory;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-            if (myName) {
-                loginScreen.style.display = 'none';
-                mainChat.style.display = 'flex';
-                
-                // Silent resync if already announced, otherwise join fresh
-                if (sessionStorage.getItem('announced_presence')) {
-                    socket.emit('resync_user', { name: myName });
-                } else {
-                    socket.emit('user_joined', { name: myName });
-                    sessionStorage.setItem('announced_presence', 'true');
-                }
-            }
-        };
-
-        socket.on('user_count', (data) => {
-            document.getElementById('user-count').innerText = data.count;
-        });
-
-        function addEmoji(emoji) { document.getElementById('msg-input').value += emoji; document.getElementById('msg-input').focus(); }
-
-        function broadcastTyping() {
-            socket.emit('typing', { user: myName, isTyping: true });
-            clearTimeout(typeTimer);
-            typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
-        }
-
-        socket.on('display_typing', (data) => {
-            typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
-        });
-
-        function sendText() {
-            const input = document.getElementById('msg-input');
-            if (input.value.trim()) {
-                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                socket.emit('message', { content: input.value, user: myName, time: timeStr });
-                input.value = '';
-                socket.emit('typing', { user: myName, isTyping: false });
-            }
-        }
-
-        socket.on('render_msg', (data) => {
-            const div = document.createElement('div');
-            if (data.user === 'System') {
-                div.className = 'message system-msg';
-                div.innerText = data.content;
-            } else {
-                const isMe = data.user === myName;
-                div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
-                const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
-                if (data.type === 'text') {
-                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${data.time}</span>`;
-                } else {
-                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${data.time}</span>`;
-                }
-            }
-            chatBox.appendChild(div);
+    window.onload = () => {
+        const savedHistory = localStorage.getItem('chat_history');
+        if (savedHistory) {
+            chatBox.innerHTML = savedHistory;
             chatBox.scrollTop = chatBox.scrollHeight;
-            localStorage.setItem('chat_history', chatBox.innerHTML);
-        });
-
-        async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                chunks = [];
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = () => {
-                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
-                    };
-                };
-                mediaRecorder.start();
-                recordBtn.classList.add('recording');
-            } catch (err) { alert("Mic blocked!"); }
         }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
-            recordBtn.classList.remove('recording');
+        if (myName) {
+            loginScreen.style.display = 'none';
+            mainChat.style.display = 'flex';
+            if (sessionStorage.getItem('announced_presence')) {
+                socket.emit('resync_user', { name: myName, role: myRole });
+            } else {
+                socket.emit('user_joined', { name: myName, role: myRole });
+                sessionStorage.setItem('announced_presence', 'true');
+            }
         }
+    };
 
-        recordBtn.addEventListener('mousedown', startRecording);
-        recordBtn.addEventListener('mouseup', stopRecording);
-        recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
-        recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+    socket.on('user_count', (data) => {
+        document.getElementById('user-count').innerText = data.count;
+    });
 
-function joinChat() {
-    const nameVal = document.getElementById('username-input').value.trim();
-    const roleVal = document.getElementById('role-input').value;
-
-    if (nameVal) {
-        myName = nameVal;
-        myRole = roleVal; // Store this globally
-        
-        localStorage.setItem('corny_name', nameVal);
-        localStorage.setItem('corny_role', roleVal);
-        
-        loginScreen.style.display = 'none';
-        mainChat.style.display = 'flex';
-        
-        // Tell the server who we are and what we do
-        socket.emit('user_joined', { name: nameVal, role: roleVal });
+    function addEmoji(emoji) { 
+        document.getElementById('msg-input').value += emoji; 
+        document.getElementById('msg-input').focus(); 
     }
-}
-        function logout() { 
-            localStorage.clear(); 
-            sessionStorage.clear();
-            location.reload(); 
+
+    function broadcastTyping() {
+        socket.emit('typing', { user: myName, isTyping: true });
+        clearTimeout(typeTimer);
+        typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
+    }
+
+    socket.on('display_typing', (data) => {
+        typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
+    });
+
+    function sendText() {
+        const input = document.getElementById('msg-input');
+        if (input.value.trim()) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            socket.emit('message', { content: input.value, user: myName, time: timeStr });
+            input.value = '';
+            socket.emit('typing', { user: myName, isTyping: false });
         }
-    </script>
+    }
+
+    socket.on('render_msg', (data) => {
+        const div = document.createElement('div');
+        const isMe = data.user === myName;
+        const isDoctor = data.sender_role === 'Doctor';
+        
+        if (data.user === 'System') {
+            div.className = 'message system-msg';
+            div.innerText = data.content;
+        } else {
+            div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
+            if (isDoctor && !isMe) {
+                div.style.borderLeft = "5px solid #007bff";
+                div.style.backgroundColor = "#e7f3ff";
+            }
+
+            const nameTag = `<span class="sender-name">${isDoctor ? '👨‍⚕️ ' : ''}${isMe ? 'You' : data.user}</span>`;
+            const timeTag = `<span class="timestamp">${data.time}</span>`;
+            
+            if (data.type === 'voice') {
+                div.innerHTML = `${nameTag}<audio controls src="${data.content}"></audio>${timeTag}`;
+            } else {
+                div.innerHTML = `${nameTag}${data.content}${timeTag}`;
+            }
+        }
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        localStorage.setItem('chat_history', chatBox.innerHTML);
+    });
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            chunks = [];
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = () => {
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
+                };
+            };
+            mediaRecorder.start();
+            recordBtn.classList.add('recording');
+        } catch (err) { alert("Mic blocked! Check settings."); }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+        recordBtn.classList.remove('recording');
+    }
+
+    recordBtn.addEventListener('mousedown', startRecording);
+    recordBtn.addEventListener('mouseup', stopRecording);
+    recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+    recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+    function joinChat() {
+        const nameVal = document.getElementById('username-input').value.trim();
+        const roleVal = document.getElementById('role-input').value;
+        if (nameVal) {
+            myName = nameVal;
+            myRole = roleVal;
+            localStorage.setItem('corny_name', nameVal);
+            localStorage.setItem('corny_role', roleVal);
+            loginScreen.style.display = 'none';
+            mainChat.style.display = 'flex';
+            socket.emit('user_joined', { name: nameVal, role: roleVal });
+        }
+    }
+
+    function logout() { 
+        localStorage.clear(); 
+        sessionStorage.clear();
+        location.reload(); 
+    }
+</script>
 </body>
 </html>
