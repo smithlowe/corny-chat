@@ -28,7 +28,7 @@
         .other-msg { align-self: flex-start; background-color: #f1f0f0; color: #333; border-bottom-left-radius: 2px; text-align: left; }
 
         /* SYSTEM MESSAGES (Center) */
-        .system-msg { align-self: center; background: none; color: #888; font-style: italic; font-size: 12px; border: none; }
+        .system-msg { align-self: center; background: none; color: #888; font-style: italic; font-size: 12px; border: none; text-align: center; width: 100%; }
 
         .sender-name { font-size: 11px; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.7; }
 
@@ -39,7 +39,7 @@
         button:hover { background: #ffcc00; }
         #record-btn.recording { background: #ff4444; color: white; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; align-self: flex-end; }
+        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; align-self: flex-end; border-radius: 5px; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -76,6 +76,7 @@
         let mediaRecorder;
         let chunks = [];
 
+        // 1. AUTO-LOGIN AND HISTORY LOADING
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
@@ -83,6 +84,12 @@
                 socket.emit('user_joined', { name: myName });
                 sessionStorage.setItem('announced_join', 'true');
             }
+        }
+
+        const savedChat = localStorage.getItem('chat_history');
+        if (savedChat) {
+            chatBox.innerHTML = savedChat;
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function joinChat() {
@@ -111,10 +118,10 @@
             }
         }
 
+        // 2. RECEIVING MESSAGES AND PERSISTING THEM
         socket.on('render_msg', (data) => {
             const div = document.createElement('div');
             
-            // DECIDE THE SIDE AND STYLE
             if (data.user === 'System') {
                 div.className = 'message system-msg';
                 div.innerText = data.content;
@@ -133,36 +140,10 @@
             
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
+
+            // SAVE THE HTML STRUCTURE TO LOCAL STORAGE
+            localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
         socket.on('user_count', (data) => {
-            document.getElementById('user-count').innerText = data.count;
-        });
-
-        // VOICE RECORDING
-        recordBtn.onmousedown = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                chunks = [];
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = () => socket.emit('voice_note', { audio: reader.result, user: myName });
-                };
-                mediaRecorder.start();
-                recordBtn.classList.add('recording');
-            } catch (err) { alert("Mic access denied"); }
-        };
-
-        recordBtn.onmouseup = () => {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-                recordBtn.classList.remove('recording');
-            }
-        };
-    </script>
-</body>
-</html>
+            document.getElementById
