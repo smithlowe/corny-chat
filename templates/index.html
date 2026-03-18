@@ -13,26 +13,28 @@
         .message { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; position: relative; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .my-msg { align-self: flex-end; background: #ffd700; color: #222; border-bottom-right-radius: 2px; }
         .other-msg { align-self: flex-start; background: #f1f1f1; color: #333; border-bottom-left-radius: 2px; }
-        .system-msg { align-self: center; background: none; color: #aaa; font-size: 11px; font-style: italic; box-shadow: none; }
+        .system-msg { align-self: center; background: none; color: #aaa; font-size: 11px; font-style: italic; box-shadow: none; margin: 5px 0; }
         .sender-name { font-size: 10px; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.7; }
         .timestamp { font-size: 9px; margin-top: 5px; display: block; text-align: right; opacity: 0.5; }
         #typing-status { height: 20px; font-size: 12px; color: #888; font-style: italic; padding-left: 10px; }
         .emoji-bar { display: flex; gap: 12px; margin: 5px 0; padding-left: 5px; font-size: 22px; cursor: pointer; }
         .controls { display: flex; gap: 8px; width: 100%; align-items: center; }
         input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
-        button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; }
+        button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; user-select: none; }
         .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; }
-        #record-btn.recording { background: #ff4444; color: white; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        audio { width: 200px; height: 35px; margin-top: 5px; }
+        
+        /* The Pulsing Red Record Light */
+        #record-btn.recording { background: #ff4444 !important; color: white !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        audio { width: 180px; height: 35px; margin-top: 5px; border-radius: 10px; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1>Corny Chat 🌽</h1>
-        <input type="text" id="username-input" placeholder="Your name...">
-        <button onclick="joinChat()" style="margin-top:15px;">Start Chatting</button>
+        <h1>Corny Chat Pro 🌽</h1>
+        <input type="text" id="username-input" placeholder="Enter your name...">
+        <button onclick="joinChat()" style="margin-top:15px; width: 200px;">Enter Chat</button>
     </div>
 
     <div id="main-chat">
@@ -67,10 +69,15 @@
         let mediaRecorder;
         let chunks = [];
 
+        // 1. Fixed "Joined" Logic
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
-            socket.emit('user_joined', { name: myName });
+            // Only announce once per session (prevents spam on refresh)
+            if (!sessionStorage.getItem('has_announced')) {
+                socket.emit('user_joined', { name: myName });
+                sessionStorage.setItem('has_announced', 'true');
+            }
         }
 
         const savedHistory = localStorage.getItem('chat_history');
@@ -123,8 +130,8 @@
             localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
-        // --- Voice Recording Logic ---
-        recordBtn.onmousedown = async () => {
+        // 2. STURDY Voice Recording Fix
+        async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
@@ -141,28 +148,36 @@
                 };
                 mediaRecorder.start();
                 recordBtn.classList.add('recording');
-            } catch (err) { alert("Mic access denied"); }
-        };
+            } catch (err) { alert("Enable Microphone Access!"); }
+        }
 
-        recordBtn.onmouseup = () => {
+        function stopRecording() {
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
-                recordBtn.classList.remove('recording');
             }
-        };
+            recordBtn.classList.remove('recording');
+        }
+
+        // Support both mouse and touch (for mobile)
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('mouseleave', stopRecording); // If mouse slides off button
+        recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+        recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 
         function joinChat() {
             const val = document.getElementById('username-input').value.trim();
             if (val) {
                 myName = val;
                 localStorage.setItem('corny_name', val);
+                sessionStorage.setItem('has_announced', 'true');
                 loginScreen.style.display = 'none';
                 mainChat.style.display = 'flex';
                 socket.emit('user_joined', { name: val });
             }
         }
 
-        function logout() { localStorage.clear(); location.reload(); }
+        function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
         socket.on('user_count', (data) => { document.getElementById('user-count').innerText = data.count; });
     </script>
 </body>
