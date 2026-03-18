@@ -8,52 +8,68 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        #main-chat { display: none; width: 100%; max-width: 500px; flex-direction: column; height: 92vh; }
-        #chat-box { flex: 1; border: 1px solid #ddd; margin: 10px 0; overflow-y: auto; background: white; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .message { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; position: relative; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        #main-chat { display: none; width: 100%; max-width: 1200px; height: 95vh; flex-direction: row; gap: 15px; }
+        #doctor-sidebar { width: 280px; background: #fff; border-radius: 20px; border: 1px solid #eee; padding: 20px; flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,0.05); display: none; }
+        #patient-list button { padding: 12px; border-radius: 12px; border: 1px solid #f0f0f0; background: #fdfdfd; cursor: pointer; text-align: left; transition: all 0.3s ease; font-weight: 500; color: #444; }
+        #patient-list button:hover { background: #ffd700 !important; border-color: #ffd700; transform: translateX(5px); }
+        #patient-list button.active-chat { background: #ffd700 !important; font-weight: bold; border-color: #ccac00; }
+        #chat-container { flex: 1; display: flex; flex-direction: column; background: transparent; }
+        #chat-box { flex: 1; border: 1px solid #ddd; margin: 10px 0; overflow-y: auto; background: white; padding: 15px; border-radius: 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; position: relative; line-height: 1.4; }
         .my-msg { align-self: flex-end; background: #ffd700; color: #222; border-bottom-right-radius: 2px; }
         .other-msg { align-self: flex-start; background: #f1f1f1; color: #333; border-bottom-left-radius: 2px; }
-        .system-msg { align-self: center; background: none; color: #aaa; font-size: 11px; font-style: italic; box-shadow: none; margin: 5px 0; }
+        .doctor-reply { border-left: 5px solid #007bff !important; background-color: #e7f3ff !important; }
+        .system-msg { align-self: center; background: none; color: #aaa; font-size: 11px; font-style: italic; margin: 5px 0; }
         .sender-name { font-size: 10px; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.7; }
         .timestamp { font-size: 9px; margin-top: 5px; display: block; text-align: right; opacity: 0.5; }
-        #typing-status { height: 20px; font-size: 12px; color: #888; font-style: italic; padding-left: 10px; }
         .emoji-bar { display: flex; gap: 12px; margin: 5px 0; padding-left: 5px; font-size: 22px; cursor: pointer; }
         .controls { display: flex; gap: 8px; width: 100%; align-items: center; }
         input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
-        button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; }
+        button.action-btn { padding: 10px 20px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; transition: 0.2s; }
         #record-btn.recording { background: #ff4444 !important; color: white !important; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        audio { width: 180px; height: 35px; margin-top: 5px; }
-        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; border: none; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .logout-btn { background: #ff4444; color: white; padding: 8px 15px; font-size: 12px; border-radius: 10px; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <h1>Corny-Comm Medical 🏥</h1>
-    <input type="text" id="username-input" placeholder="Your Full Name...">
-    <select id="role-input" style="margin-top:10px; padding:10px; border-radius:25px; width:220px;">
+    <h1 style="font-size: 2.5rem; color: #333;">Corny-Comm Medical 🏥</h1>
+    <p style="color: #666; margin-bottom: 20px;">Secure Consultations for Ugandan Medics</p>
+    <input type="text" id="username-input" placeholder="Your Full Name..." style="width: 250px;">
+    <select id="role-input" style="margin-top:10px; padding:12px; border-radius:25px; width:275px; border: 1px solid #ccc;">
         <option value="Patient">I am a Patient</option>
         <option value="Doctor">I am a Doctor/Medic</option>
     </select>
-    <button onclick="joinChat()" style="margin-top:15px; width: 220px;">Start Consultation</button>
+    <button class="action-btn" onclick="joinChat()" style="margin-top:15px; width: 275px; padding: 15px;">Enter Clinic</button>
 </div>
 
 <div id="main-chat">
-    <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
-        <span style="color: #666; font-weight: bold;">🌽 Online: <span id="user-count">0</span></span>
-        <button class="logout-btn" onclick="logout()">Logout</button>
+    <div id="doctor-sidebar">
+        <h3 style="font-size: 16px; color: #007bff; margin-top: 0;">📋 Active Patients</h3>
+        <p style="font-size: 11px; color: #888;">Select a patient to start a private chat</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 15px;">
+        <div id="patient-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;"></div>
     </div>
-    <div id="chat-box"></div>
-    <div id="typing-status"></div>
-    <div class="emoji-bar">
-        <span onclick="addEmoji('🌽')">🌽</span><span onclick="addEmoji('❤️')">❤️</span>
-        <span onclick="addEmoji('😂')">😂</span><span onclick="addEmoji('🔥')">🔥</span>
-    </div>
-    <div class="controls">
-        <input type="text" id="msg-input" placeholder="Message..." oninput="broadcastTyping()" onkeypress="if(event.key==='Enter')sendText()">
-        <button onclick="sendText()">Send</button>
-        <button id="record-btn">🎤</button>
+
+    <div id="chat-container">
+        <div style="display:flex; justify-content:space-between; align-items: center; padding: 0 5px;">
+            <div>
+                <span id="chat-header" style="color: #333; font-weight: bold; font-size: 18px;">🏥 Clinic Overview</span>
+                <div style="font-size: 12px; color: #28a745;">● <span id="user-count">0</span> Users Online</div>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+        <div id="chat-box"></div>
+        <div id="typing-status" style="height: 20px; font-size: 12px; color: #888; margin-left: 10px;"></div>
+        <div class="emoji-bar">
+            <span onclick="addEmoji('🌽')">🌽</span><span onclick="addEmoji('🏥')">🏥</span><span onclick="addEmoji('❤️')">❤️</span><span onclick="addEmoji('😂')">😂</span>
+        </div>
+        <div class="controls">
+            <input type="text" id="msg-input" placeholder="Type a message..." oninput="broadcastTyping()" onkeypress="if(event.key==='Enter')sendText()">
+            <button class="action-btn" onclick="sendText()">Send</button>
+            <button id="record-btn" class="action-btn" style="background: #eee;">🎤</button>
+        </div>
     </div>
 </div>
 
@@ -64,8 +80,10 @@
     const mainChat = document.getElementById('main-chat');
     const typingStatus = document.getElementById('typing-status');
     const recordBtn = document.getElementById('record-btn');
+    
     let myName = localStorage.getItem('corny_name');
     let myRole = localStorage.getItem('corny_role') || 'Patient';
+    let currentTargetSid = null; 
     let typeTimer, mediaRecorder, chunks = [];
 
     window.onload = () => {
@@ -77,22 +95,37 @@
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
-            if (sessionStorage.getItem('announced_presence')) {
-                socket.emit('resync_user', { name: myName, role: myRole });
-            } else {
-                socket.emit('user_joined', { name: myName, role: myRole });
-                sessionStorage.setItem('announced_presence', 'true');
-            }
+            if (myRole === 'Doctor') document.getElementById('doctor-sidebar').style.display = 'flex';
+            socket.emit('user_joined', { name: myName, role: myRole });
         }
     };
 
     socket.on('user_count', (data) => {
         document.getElementById('user-count').innerText = data.count;
+        if (myRole === 'Doctor' && data.users_list) {
+            const listDiv = document.getElementById('patient-list');
+            listDiv.innerHTML = ''; 
+            data.users_list.forEach(user => {
+                if (user.role === 'Patient') {
+                    const btn = document.createElement('button');
+                    btn.innerHTML = `<b>👤 ${user.name}</b><br><small>Ready for consultation</small>`;
+                    if(user.sid === currentTargetSid) btn.className = 'active-chat';
+                    btn.onclick = () => {
+                        currentTargetSid = user.sid;
+                        document.getElementById('chat-header').innerText = `💬 Consulting: ${user.name}`;
+                        document.querySelectorAll('#patient-list button').forEach(b => b.classList.remove('active-chat'));
+                        btn.classList.add('active-chat');
+                    };
+                    listDiv.appendChild(btn);
+                }
+            });
+        }
     });
 
     function addEmoji(emoji) { 
-        document.getElementById('msg-input').value += emoji; 
-        document.getElementById('msg-input').focus(); 
+        const input = document.getElementById('msg-input');
+        input.value += emoji; 
+        input.focus(); 
     }
 
     function broadcastTyping() {
@@ -109,7 +142,7 @@
         const input = document.getElementById('msg-input');
         if (input.value.trim()) {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            socket.emit('message', { content: input.value, user: myName, time: timeStr });
+            socket.emit('message', { content: input.value, user: myName, time: timeStr, target: currentTargetSid });
             input.value = '';
             socket.emit('typing', { user: myName, isTyping: false });
         }
@@ -119,20 +152,14 @@
         const div = document.createElement('div');
         const isMe = data.user === myName;
         const isDoctor = data.sender_role === 'Doctor';
-        
         if (data.user === 'System') {
             div.className = 'message system-msg';
             div.innerText = data.content;
         } else {
             div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
-            if (isDoctor && !isMe) {
-                div.style.borderLeft = "5px solid #007bff";
-                div.style.backgroundColor = "#e7f3ff";
-            }
-
+            if (isDoctor && !isMe) div.classList.add('doctor-reply');
             const nameTag = `<span class="sender-name">${isDoctor ? '👨‍⚕️ ' : ''}${isMe ? 'You' : data.user}</span>`;
             const timeTag = `<span class="timestamp">${data.time}</span>`;
-            
             if (data.type === 'voice') {
                 div.innerHTML = `${nameTag}<audio controls src="${data.content}"></audio>${timeTag}`;
             } else {
@@ -143,6 +170,20 @@
         chatBox.scrollTop = chatBox.scrollHeight;
         localStorage.setItem('chat_history', chatBox.innerHTML);
     });
+
+    function joinChat() {
+        const nameVal = document.getElementById('username-input').value.trim();
+        const roleVal = document.getElementById('role-input').value;
+        if (nameVal) {
+            myName = nameVal; myRole = roleVal;
+            localStorage.setItem('corny_name', nameVal);
+            localStorage.setItem('corny_role', roleVal);
+            loginScreen.style.display = 'none';
+            mainChat.style.display = 'flex';
+            if (roleVal === 'Doctor') document.getElementById('doctor-sidebar').style.display = 'flex';
+            socket.emit('user_joined', { name: nameVal, role: roleVal });
+        }
+    }
 
     async function startRecording() {
         try {
@@ -156,16 +197,16 @@
                 reader.readAsDataURL(blob);
                 reader.onloadend = () => {
                     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
+                    socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr, target: currentTargetSid });
                 };
             };
             mediaRecorder.start();
             recordBtn.classList.add('recording');
-        } catch (err) { alert("Mic blocked! Check settings."); }
+        } catch (err) { alert("Mic blocked!"); }
     }
 
     function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+        if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
         recordBtn.classList.remove('recording');
     }
 
@@ -174,25 +215,7 @@
     recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
     recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 
-    function joinChat() {
-        const nameVal = document.getElementById('username-input').value.trim();
-        const roleVal = document.getElementById('role-input').value;
-        if (nameVal) {
-            myName = nameVal;
-            myRole = roleVal;
-            localStorage.setItem('corny_name', nameVal);
-            localStorage.setItem('corny_role', roleVal);
-            loginScreen.style.display = 'none';
-            mainChat.style.display = 'flex';
-            socket.emit('user_joined', { name: nameVal, role: roleVal });
-        }
-    }
-
-    function logout() { 
-        localStorage.clear(); 
-        sessionStorage.clear();
-        location.reload(); 
-    }
+    function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
 </script>
 </body>
 </html>
