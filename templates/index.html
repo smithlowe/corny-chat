@@ -9,26 +9,32 @@
         body { font-family: sans-serif; background-color: #fffef0; text-align: center; padding: 20px; margin: 0; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         #main-chat { display: none; flex-direction: column; align-items: center; }
-        #chat-box { width: 100%; max-width: 500px; height: 400px; border: 2px solid #ffd700; margin: 20px auto; overflow-y: auto; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #chat-box { width: 100%; max-width: 500px; height: 400px; border: 2px solid #ffd700; margin: 10px auto; overflow-y: auto; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .message { text-align: left; background: #fdfdfd; padding: 10px; margin: 10px 0; border-radius: 8px; border-left: 5px solid #ffd700; }
         .controls { display: flex; gap: 10px; width: 100%; max-width: 500px; margin: 0 auto; }
         input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ddd; }
         button { padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; background: #ffd700; }
         #record-btn.recording { background: #ff4444; color: white; }
+        .logout-btn { background: #ff4444; color: white; padding: 5px 15px; font-size: 12px; margin: 10px 0; border-radius: 5px; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <h1>Welcome to Corny Chat 🌽</h1>
-        <input type="text" id="username-input" placeholder="Enter your name...">
+        <p>Enter your name to start chatting</p>
+        <input type="text" id="username-input" placeholder="Your name...">
         <button onclick="joinChat()">Join Chat</button>
     </div>
 
     <div id="main-chat">
         <h1>Corny Chat 🌽</h1>
         <div style="font-weight: bold;">Online: <span id="user-count">0</span> Users</div>
+        
+        <button class="logout-btn" onclick="logout()">Logout / Change Name</button>
+        
         <div id="chat-box"></div>
+
         <div class="controls">
             <input type="text" id="msg-input" placeholder="Type a message...">
             <button onclick="sendText()">Send 🌽</button>
@@ -42,18 +48,24 @@
         const loginScreen = document.getElementById('login-screen');
         const mainChat = document.getElementById('main-chat');
         const recordBtn = document.getElementById('record-btn');
+        
         let myName = localStorage.getItem('corny_name');
         let mediaRecorder;
         let chunks = [];
 
-        // 1. AUTO-LOGIN CHECK
+        // --- 1. AUTO-LOGIN LOGIC ---
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
-            socket.emit('user_joined', { name: myName });
+            
+            // Only announce join if it's a fresh session (not a refresh)
+            if (!sessionStorage.getItem('announced_join')) {
+                socket.emit('user_joined', { name: myName });
+                sessionStorage.setItem('announced_join', 'true');
+            }
         }
 
-        // 2. LOAD LOCAL MESSAGE HISTORY
+        // --- 2. LOAD MESSAGE HISTORY ---
         const savedChat = localStorage.getItem('chat_history');
         if (savedChat) {
             chatBox.innerHTML = savedChat;
@@ -64,11 +76,20 @@
             const input = document.getElementById('username-input');
             if (input.value.trim() !== "") {
                 myName = input.value.trim();
-                localStorage.setItem('corny_name', myName); // Remember name
+                localStorage.setItem('corny_name', myName); 
+                sessionStorage.setItem('announced_join', 'true'); // Manual login always announces
+                
                 loginScreen.style.display = 'none';
                 mainChat.style.display = 'flex';
                 socket.emit('user_joined', { name: myName });
             }
+        }
+
+        function logout() {
+            localStorage.removeItem('corny_name');
+            localStorage.removeItem('chat_history');
+            sessionStorage.removeItem('announced_join');
+            location.reload(); 
         }
 
         function sendText() {
@@ -79,6 +100,7 @@
             }
         }
 
+        // --- 3. SOCKET LISTENERS ---
         socket.on('render_msg', (data) => {
             const div = document.createElement('div');
             div.className = 'message';
@@ -91,8 +113,6 @@
             }
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
-
-            // Save history locally after every new message
             localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
@@ -100,7 +120,7 @@
             document.getElementById('user-count').innerText = data.count;
         });
 
-        // VOICE RECORDING LOGIC
+        // --- 4. VOICE RECORDING ---
         recordBtn.onmousedown = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
