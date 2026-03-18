@@ -19,8 +19,30 @@ def handle_connect():
 
 @socketio.on('user_joined')
 def handle_user_joined(data):
-    # Map this specific connection ID to the username
-    active_users[request.sid] = data['name']
+    # We now save a 'dictionary' of info for each user
+    active_users[request.sid] = {
+        'name': data['name'],
+        'role': data.get('role', 'Patient') # Defaults to Patient if not sent
+    }
+    
+    # Custom announcement based on role
+    user_name = data['name']
+    if data.get('role') == 'Doctor':
+        msg = f"👨‍⚕️ Dr. {user_name} has entered the clinic."
+    else:
+        msg = f"🏥 Patient {user_name} is requesting a consultation."
+
+    emit('render_msg', {'user': 'System', 'content': msg}, broadcast=True)
+    emit('user_count', {'count': len(active_users)}, broadcast=True)
+
+@socketio.on('resync_user')
+def handle_resync(data):
+    # This keeps them logged in when they refresh
+    active_users[request.sid] = {
+        'name': data['name'],
+        'role': data.get('role', 'Patient')
+    }
+    emit('user_count', {'count': len(active_users)}, broadcast=True)
     
     # Broadcast join message to everyone
     emit('render_msg', {'user': 'System', 'content': f"🌽 {data['name']} joined the field!"}, broadcast=True)

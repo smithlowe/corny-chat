@@ -30,10 +30,16 @@
 <body>
 
     <div id="login-screen">
-        <h1>Corny Chat Pro 🌽</h1>
-        <input type="text" id="username-input" placeholder="Enter your name...">
-        <button onclick="joinChat()" style="margin-top:15px; width: 200px;">Enter Chat</button>
-    </div>
+    <h1>Corny-Comm Medical 🏥</h1>
+    <input type="text" id="username-input" placeholder="Your Full Name...">
+    
+    <select id="role-input" style="margin-top:10px; padding:10px; border-radius:25px; width:220px;">
+        <option value="Patient">I am a Patient</option>
+        <option value="Doctor">I am a Doctor/Medic</option>
+    </select>
+
+    <button onclick="joinChat()" style="margin-top:15px; width: 220px;">Start Consultation</button>
+</div>
 
     <div id="main-chat">
         <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
@@ -159,18 +165,24 @@
         recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
         recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 
-        function joinChat() {
-            const val = document.getElementById('username-input').value.trim();
-            if (val) {
-                myName = val;
-                localStorage.setItem('corny_name', val);
-                sessionStorage.setItem('announced_presence', 'true');
-                loginScreen.style.display = 'none';
-                mainChat.style.display = 'flex';
-                socket.emit('user_joined', { name: val });
-            }
-        }
+function joinChat() {
+    const nameVal = document.getElementById('username-input').value.trim();
+    const roleVal = document.getElementById('role-input').value;
 
+    if (nameVal) {
+        myName = nameVal;
+        myRole = roleVal; // Store this globally
+        
+        localStorage.setItem('corny_name', nameVal);
+        localStorage.setItem('corny_role', roleVal);
+        
+        loginScreen.style.display = 'none';
+        mainChat.style.display = 'flex';
+        
+        // Tell the server who we are and what we do
+        socket.emit('user_joined', { name: nameVal, role: roleVal });
+    }
+}
         function logout() { 
             localStorage.clear(); 
             sessionStorage.clear();
