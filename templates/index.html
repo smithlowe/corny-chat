@@ -6,7 +6,7 @@
     <title>Corny Chat Pro 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         #main-chat { display: none; width: 100%; max-width: 500px; flex-direction: column; height: 92vh; }
         #chat-box { flex: 1; border: 1px solid #ddd; margin: 10px 0; overflow-y: auto; background: white; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
@@ -23,8 +23,8 @@
         button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; }
         #record-btn.recording { background: #ff4444 !important; color: white !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        audio { width: 180px; height: 35px; margin-top: 5px; }
-        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; }
+        audio { width: 180px; height: 35px; margin-top: 5px; border-radius: 10px; }
+        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
@@ -63,19 +63,29 @@
         let myName = localStorage.getItem('corny_name');
         let typeTimer, mediaRecorder, chunks = [];
 
-        // UI Initialization
-        if (myName) {
-            loginScreen.style.display = 'none';
-            mainChat.style.display = 'flex';
-            socket.emit('user_joined', { name: myName });
-        }
+        // LOAD HISTORY AND LOGIN STATE
+        window.onload = () => {
+            const savedHistory = localStorage.getItem('chat_history');
+            if (savedHistory) {
+                chatBox.innerHTML = savedHistory;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+            if (myName) {
+                loginScreen.style.display = 'none';
+                mainChat.style.display = 'flex';
+                socket.emit('user_joined', { name: myName });
+            }
+        };
 
-        // Logic for Online Counter
         socket.on('user_count', (data) => {
             document.getElementById('user-count').innerText = data.count;
         });
 
-        function addEmoji(emoji) { document.getElementById('msg-input').value += emoji; document.getElementById('msg-input').focus(); }
+        function addEmoji(emoji) { 
+            const input = document.getElementById('msg-input');
+            input.value += emoji; 
+            input.focus(); 
+        }
 
         function broadcastTyping() {
             socket.emit('typing', { user: myName, isTyping: true });
@@ -106,14 +116,19 @@
                 const isMe = data.user === myName;
                 div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
                 const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
+                const displayTime = data.time || "Just now";
+                
                 if (data.type === 'text') {
-                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${data.time}</span>`;
+                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${displayTime}</span>`;
                 } else {
-                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${data.time}</span>`;
+                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${displayTime}</span>`;
                 }
             }
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
+            
+            // PERSISTENCE: Save the new bubble to local memory
+            localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
         async function startRecording() {
@@ -133,16 +148,21 @@
                 };
                 mediaRecorder.start();
                 recordBtn.classList.add('recording');
-            } catch (err) { alert("Mic blocked!"); }
+            } catch (err) { alert("Enable Microphone Access!"); }
         }
 
         function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
             recordBtn.classList.remove('recording');
         }
 
+        // Mouse Events
         recordBtn.addEventListener('mousedown', startRecording);
         recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('mouseleave', stopRecording);
+        // Mobile Touch Events
         recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
         recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 
@@ -157,7 +177,11 @@
             }
         }
 
-        function logout() { localStorage.clear(); location.reload(); }
+        function logout() { 
+            localStorage.removeItem('chat_history'); 
+            localStorage.removeItem('corny_name'); 
+            location.reload(); 
+        }
     </script>
 </body>
 </html>
