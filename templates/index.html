@@ -64,7 +64,7 @@
     let typeTimer, mediaRecorder, chunks = [];
 
     // 1. UPDATED LOAD LOGIC (The "Quiet" Fix)
-    window.onload = () => {
+window.onload = () => {
         const savedHistory = localStorage.getItem('chat_history');
         if (savedHistory) {
             chatBox.innerHTML = savedHistory;
@@ -75,14 +75,15 @@
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
             
-            // Check if we already announced ourselves in this specific tab session
-            if (!sessionStorage.getItem('announced_presence')) {
+            // If we already announced, just "silently" reconnect to update the count
+            if (sessionStorage.getItem('announced_presence')) {
+                socket.emit('resync_user', { name: myName });
+            } else {
                 socket.emit('user_joined', { name: myName });
                 sessionStorage.setItem('announced_presence', 'true');
             }
         }
     };
-
     socket.on('user_count', (data) => {
         document.getElementById('user-count').innerText = data.count;
     });
@@ -147,13 +148,13 @@
                 reader.readAsDataURL(blob);
                 reader.onloadend = () => {
                     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
+                   socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
                 };
             };
             mediaRecorder.start();
             recordBtn.classList.add('recording');
         } catch (err) { alert("Enable Microphone Access!"); }
-    }
+    } 
 
     function stopRecording() {
         if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }

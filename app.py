@@ -21,6 +21,12 @@ def handle_connect():
 def handle_user_joined(data):
     # Map this specific connection ID to the username
     active_users[request.sid] = data['name']
+    @socketio.on('resync_user')
+def handle_resync(data):
+    # Just add them to the active list without broadcasting a "Joined" message
+    active_users[request.sid] = data['name']
+    # Update the count for everyone
+    emit('user_count', {'count': len(active_users)}, broadcast=True)
     
     # Broadcast join message
     emit('render_msg', {'user': 'System', 'content': f"🌽 {data['name']} joined the field!"}, broadcast=True)
