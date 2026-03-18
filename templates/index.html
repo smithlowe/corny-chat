@@ -1,11 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corny Chat 🌽</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #fffef0; text-align: center; padding: 20px; margin: 0; }
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        #main-chat { display: none; flex-direction: column; align-items: center; }
+        #chat-box { width: 100%; max-width: 500px; height: 400px; border: 2px solid #ffd700; margin: 20px auto; overflow-y: auto; background: white; padding: 15px; border-radius: 10px; }
+        .message { text-align: left; background: #fdfdfd; padding: 10px; margin: 10px 0; border-radius: 8px; border-left: 5px solid #ffd700; }
+        .controls { display: flex; gap: 10px; width: 100%; max-width: 500px; margin: 0 auto; }
+        input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ddd; }
+        button { padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; background: #ffd700; }
+    </style>
+</head>
 <body>
-    <div id="login-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#ffd700; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100;">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
         <h1>Welcome to Corny Chat 🌽</h1>
-        <input type="text" id="username-input" placeholder="Enter your name..." style="padding:15px; border-radius:10px; border:none; width:250px;">
-        <button onclick="joinChat()" style="margin-top:15px; background:white; padding:10px 30px;">Join Chat</button>
+        <input type="text" id="username-input" placeholder="Enter your name...">
+        <button onclick="joinChat()">Join Chat</button>
     </div>
 
-    <div id="main-chat" style="display:none;">
+    <!-- MAIN CHAT SCREEN -->
+    <div id="main-chat">
         <h1>Corny Chat 🌽</h1>
         <div style="font-weight: bold;">Online: <span id="user-count">0</span> Users</div>
         <div id="chat-box"></div>
@@ -22,17 +43,35 @@
 
         function joinChat() {
             const input = document.getElementById('username-input');
-            if (input.value.trim()) {
+            const login = document.getElementById('login-screen');
+            const chat = document.getElementById('main-chat');
+
+            if (input.value.trim() !== "") {
                 myName = input.value.trim();
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-chat').style.display = 'block';
-                // Tell the server who joined
+                console.log("Joining as:", myName);
+                
+                // Hide login, show chat
+                login.style.setProperty('display', 'none', 'important');
+                chat.style.display = 'flex';
+                
                 socket.emit('user_joined', { name: myName });
+            } else {
+                alert("Please enter a name!");
+            }
+        }
+
+        // Send Text
+        function sendText() {
+            const msgInput = document.getElementById('msg-input');
+            if (msgInput.value.trim()) {
+                socket.emit('message', { content: msgInput.value, user: myName });
+                msgInput.value = '';
             }
         }
 
         // Receive Messages
         socket.on('render_msg', (data) => {
+            const chatBox = document.getElementById('chat-box');
             const div = document.createElement('div');
             div.className = 'message';
             const sender = data.user === myName ? "Me" : data.user;
@@ -42,41 +81,42 @@
             } else {
                 div.innerHTML = `<strong>${sender}:</strong> <audio src="${data.content}" controls></audio>`;
             }
-            document.getElementById('chat-box').appendChild(div);
-            document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
         });
 
-        // Update Counter
         socket.on('user_count', (data) => {
             document.getElementById('user-count').innerText = data.count;
         });
 
-        function sendText() {
-            const input = document.getElementById('msg-input');
-            if (input.value.trim()) {
-                socket.emit('message', { content: input.value, user: myName });
-                input.value = '';
-            }
-        }
-
-        // Voice Recording (Updated to include name)
+        // Voice Recording
         const recordBtn = document.getElementById('record-btn');
         let mediaRecorder;
         let chunks = [];
+
         recordBtn.onmousedown = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            chunks = [];
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                const reader = new FileReader();
-                reader.readAsDataURL(blob);
-                reader.onloadend = () => socket.emit('voice_note', { audio: reader.result, user: myName });
-            };
-            mediaRecorder.start();
-            recordBtn.innerText = "Recording...";
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => socket.emit('voice_note', { audio: reader.result, user: myName });
+                };
+                mediaRecorder.start();
+                recordBtn.innerText = "Recording...";
+            } catch (err) { alert("Mic access denied"); }
         };
-        recordBtn.onmouseup = () => { if(mediaRecorder) { mediaRecorder.stop(); recordBtn.innerText = "🎤 Record"; } };
+
+        recordBtn.onmouseup = () => {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                recordBtn.innerText = "🎤 Record";
+            }
+        };
     </script>
 </body>
+</html>
