@@ -6,58 +6,38 @@
     <title>Corny Chat 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fffef0; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fffef0; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         #main-chat { display: none; width: 100%; max-width: 500px; flex-direction: column; }
-
-        /* CHAT BOX STYLING */
-        #chat-box { 
-            width: 100%; height: 500px; border: 1px solid #e0e0e0; margin: 10px 0; 
-            overflow-y: auto; background: #ffffff; padding: 15px; border-radius: 15px; 
-            display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        /* MESSAGE BUBBLES */
-        .message { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 14px; line-height: 1.4; position: relative; }
-        
-        /* MY MESSAGES (Right Side) */
-        .my-msg { align-self: flex-end; background-color: #ffd700; color: #333; border-bottom-right-radius: 2px; text-align: right; }
-        
-        /* OTHERS' MESSAGES (Left Side) */
-        .other-msg { align-self: flex-start; background-color: #f1f0f0; color: #333; border-bottom-left-radius: 2px; text-align: left; }
-
-        /* SYSTEM MESSAGES (Center) */
-        .system-msg { align-self: center; background: none; color: #888; font-style: italic; font-size: 12px; border: none; text-align: center; width: 100%; }
-
-        .sender-name { font-size: 11px; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.7; }
-
-        /* CONTROLS */
+        #chat-box { width: 100%; height: 480px; border: 1px solid #ddd; margin: 10px 0; overflow-y: auto; background: white; padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .message { max-width: 80%; padding: 10px 14px; border-radius: 15px; font-size: 14px; line-height: 1.4; }
+        .my-msg { align-self: flex-end; background: #ffd700; color: #333; border-bottom-right-radius: 2px; }
+        .other-msg { align-self: flex-start; background: #f1f1f1; color: #333; border-bottom-left-radius: 2px; }
+        .system-msg { align-self: center; background: none; color: #999; font-size: 12px; font-style: italic; text-align: center; width: 100%; }
+        .sender { font-size: 11px; font-weight: bold; display: block; margin-bottom: 2px; opacity: 0.7; }
         .controls { display: flex; gap: 8px; width: 100%; }
-        input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ddd; outline: none; }
-        button { padding: 10px 20px; cursor: pointer; border-radius: 25px; border: none; font-weight: bold; background: #ffd700; transition: 0.2s; }
+        input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
+        button { padding: 10px 18px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button:hover { background: #ffcc00; }
-        #record-btn.recording { background: #ff4444; color: white; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; align-self: flex-end; border-radius: 5px; border: none; cursor: pointer; }
+        .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 6px; cursor: pointer; border: none; }
+        #record-btn.recording { background: #ff4444; color: white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <h1>Corny Chat 🌽</h1>
-        <input type="text" id="username-input" placeholder="Your name...">
+        <input type="text" id="username-input" placeholder="Enter your name...">
         <button onclick="joinChat()" style="margin-top:10px;">Join the Field</button>
     </div>
 
     <div id="main-chat">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-weight: bold; color: #555;">Online: <span id="user-count">0</span></span>
+        <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
+            <span style="font-weight: bold; color: #666;">Online: <span id="user-count">0</span></span>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
-        
         <div id="chat-box"></div>
-
         <div class="controls">
             <input type="text" id="msg-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendText()">
             <button onclick="sendText()">Send</button>
@@ -66,84 +46,103 @@
     </div>
 
     <script>
-        const socket = io();
+        // Specific connection settings for Render
+        const socket = io({
+            transports: ["websocket", "polling"],
+            rememberUpgrade: true
+        });
+
         const chatBox = document.getElementById('chat-box');
         const loginScreen = document.getElementById('login-screen');
         const mainChat = document.getElementById('main-chat');
         const recordBtn = document.getElementById('record-btn');
-        
         let myName = localStorage.getItem('corny_name');
         let mediaRecorder;
         let chunks = [];
 
-        // 1. AUTO-LOGIN AND HISTORY LOADING
+        // 1. Auto-Login & History
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
-            if (!sessionStorage.getItem('announced_join')) {
+            if (!sessionStorage.getItem('announced')) {
                 socket.emit('user_joined', { name: myName });
-                sessionStorage.setItem('announced_join', 'true');
+                sessionStorage.setItem('announced', 'true');
             }
         }
 
-        const savedChat = localStorage.getItem('chat_history');
-        if (savedChat) {
-            chatBox.innerHTML = savedChat;
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+        const history = localStorage.getItem('chat_history');
+        if (history) { chatBox.innerHTML = history; chatBox.scrollTop = chatBox.scrollHeight; }
 
         function joinChat() {
-            const input = document.getElementById('username-input');
-            if (input.value.trim() !== "") {
-                myName = input.value.trim();
-                localStorage.setItem('corny_name', myName); 
-                sessionStorage.setItem('announced_join', 'true');
+            const val = document.getElementById('username-input').value.trim();
+            if (val) {
+                myName = val;
+                localStorage.setItem('corny_name', val);
+                sessionStorage.setItem('announced', 'true');
                 loginScreen.style.display = 'none';
                 mainChat.style.display = 'flex';
-                socket.emit('user_joined', { name: myName });
+                socket.emit('user_joined', { name: val });
             }
         }
 
-        function logout() {
-            localStorage.clear();
-            sessionStorage.clear();
-            location.reload(); 
-        }
+        function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
 
         function sendText() {
-            const msgInput = document.getElementById('msg-input');
-            if (msgInput.value.trim()) {
-                socket.emit('message', { content: msgInput.value, user: myName });
-                msgInput.value = '';
+            const input = document.getElementById('msg-input');
+            if (input.value.trim()) {
+                socket.emit('message', { content: input.value, user: myName });
+                input.value = '';
             }
         }
 
-        // 2. RECEIVING MESSAGES AND PERSISTING THEM
+        // 2. Rendering Messages
         socket.on('render_msg', (data) => {
             const div = document.createElement('div');
-            
             if (data.user === 'System') {
                 div.className = 'message system-msg';
                 div.innerText = data.content;
             } else {
                 const isMe = data.user === myName;
                 div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
-                
-                const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
+                const nameTag = `<span class="sender">${isMe ? 'You' : data.user}</span>`;
                 
                 if (data.type === 'text') {
-                    div.innerHTML = `${nameTag}${data.content}`;
+                    div.innerHTML = nameTag + data.content;
                 } else {
-                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls style="width: 200px;"></audio>`;
+                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls style="width:180px;"></audio>`;
                 }
             }
-            
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
-
-            // SAVE THE HTML STRUCTURE TO LOCAL STORAGE
             localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
-        socket.on('user_count', (data) => {
-            document.getElementById
+        socket.on('user_count', (data) => { document.getElementById('user-count').innerText = data.count; });
+
+        // 3. Voice Recording
+        recordBtn.onmousedown = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => socket.emit('voice_note', { audio: reader.result, user: myName });
+                };
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+            } catch (err) { alert("Mic access denied"); }
+        };
+
+        recordBtn.onmouseup = () => {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+            }
+        };
+    </script>
+</body>
+</html>
