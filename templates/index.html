@@ -100,19 +100,29 @@
         }
     };
 
-    socket.on('user_count', (data) => {
+   socket.on('user_count', (data) => {
         document.getElementById('user-count').innerText = data.count;
+        
+        // 🚀 UPDATED: Only run this if I am a Doctor
         if (myRole === 'Doctor' && data.users_list) {
             const listDiv = document.getElementById('patient-list');
             listDiv.innerHTML = ''; 
+            
             data.users_list.forEach(user => {
-                if (user.role === 'Patient') {
+                // 🏥 DOCTOR LOGIC: 
+                // Don't show myself in my own list, but show everyone else
+                if (user.name !== myName) {
                     const btn = document.createElement('button');
-                    btn.innerHTML = `<b>👤 ${user.name}</b><br><small>Ready for consultation</small>`;
+                    
+                    // Add a special tag if the other person is also a Doctor
+                    const roleTag = user.role === 'Doctor' ? '👨‍⚕️ Staff' : '👤 Patient';
+                    btn.innerHTML = `<b>${roleTag}: ${user.name}</b><br><small>${user.role === 'Doctor' ? 'Colleague' : 'Ready for consultation'}</small>`;
+                    
                     if(user.sid === currentTargetSid) btn.className = 'active-chat';
+
                     btn.onclick = () => {
                         currentTargetSid = user.sid;
-                        document.getElementById('chat-header').innerText = `💬 Consulting: ${user.name}`;
+                        document.getElementById('chat-header').innerText = `💬 Chatting with: ${user.name}`;
                         document.querySelectorAll('#patient-list button').forEach(b => b.classList.remove('active-chat'));
                         btn.classList.add('active-chat');
                     };
@@ -121,7 +131,6 @@
             });
         }
     });
-
     function addEmoji(emoji) { 
         const input = document.getElementById('msg-input');
         input.value += emoji; 
