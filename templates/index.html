@@ -6,42 +6,46 @@
     <title>Corny Chat 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: #fffef0; text-align: center; }
-        #chat-box { width: 90%; max-width: 500px; height: 400px; border: 2px solid #ffd700; margin: 20px auto; overflow-y: auto; background: white; padding: 10px; border-radius: 10px; }
-        .message { text-align: left; background: #f9f9f9; padding: 8px; margin: 5px; border-radius: 5px; border-left: 5px solid #ffd700; }
-        .controls { margin-top: 10px; }
-        button { padding: 10px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
-        #record-btn.recording { background: red; color: white; }
+        body { font-family: sans-serif; background-color: #fffef0; text-align: center; padding: 20px; }
+        #chat-box { width: 100%; max-width: 500px; height: 400px; border: 2px solid #ffd700; margin: 20px auto; overflow-y: auto; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .message { text-align: left; background: #fdfdfd; padding: 10px; margin: 10px 0; border-radius: 8px; border-left: 5px solid #ffd700; }
+        .controls { display: flex; gap: 10px; max-width: 500px; margin: 0 auto; }
+        input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ddd; }
+        button { padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; background: #ffd700; }
+        #record-btn { background: #ff4444; color: white; }
+        #record-btn.recording { background: #990000; }
     </style>
 </head>
 <body>
     <h1>Corny Chat 🌽</h1>
-    <div>Online: <span id="user-count">0</span></div>
+    <div style="font-weight: bold;">Online: <span id="user-count">0</span> Users</div>
+    
     <div id="chat-box"></div>
+
     <div class="controls">
-        <input type="text" id="msg-input" placeholder="Type here...">
-        <button onclick="sendText()">Send</button>
-        <button id="record-btn">🎤 Hold to Record</button>
+        <input type="text" id="msg-input" placeholder="Type a message...">
+        <button onclick="sendText()">Send 🌽</button>
+        <button id="record-btn">🎤 Record</button>
     </div>
 
     <script>
         const socket = io();
         const chatBox = document.getElementById('chat-box');
         const userCount = document.getElementById('user-count');
+        const msgInput = document.getElementById('msg-input');
 
-        // Update user count
+        // Update Counter
         socket.on('user_count', (data) => { userCount.innerText = data.count; });
 
-        // Function to send text
+        // Send Text
         function sendText() {
-            const input = document.getElementById('msg-input');
-            if (input.value) {
-                socket.emit('message', { content: input.value });
-                input.value = '';
+            if (msgInput.value.trim()) {
+                socket.emit('message', { content: msgInput.value });
+                msgInput.value = '';
             }
         }
 
-        // Receive and display messages (Text or Voice)
+        // Receive Messages (The fix for all users seeing them)
         socket.on('render_msg', (data) => {
             const div = document.createElement('div');
             div.className = 'message';
@@ -54,29 +58,33 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         });
 
-        // Voice Recording Logic
+        // Voice Recording
         const recordBtn = document.getElementById('record-btn');
         let mediaRecorder;
         let chunks = [];
 
         recordBtn.onmousedown = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            chunks = [];
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                const reader = new FileReader();
-                reader.readAsDataURL(blob);
-                reader.onloadend = () => socket.emit('voice_note', { audio: reader.result });
-            };
-            mediaRecorder.start();
-            recordBtn.classList.add('recording');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => socket.emit('voice_note', { audio: reader.result });
+                };
+                mediaRecorder.start();
+                recordBtn.innerText = "Recording...";
+                recordBtn.classList.add('recording');
+            } catch (err) { alert("Mic access denied"); }
         };
 
         recordBtn.onmouseup = () => {
-            if(mediaRecorder) {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
+                recordBtn.innerText = "🎤 Record";
                 recordBtn.classList.remove('recording');
             }
         };
