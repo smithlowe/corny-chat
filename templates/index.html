@@ -6,24 +6,29 @@
     <title>Corny Chat 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fffef0; display: flex; flex-direction: column; align-items: center; }
-        #chat-box { width: 90%; max-width: 500px; height: 400px; border: 2px solid #ffd700; background: white; overflow-y: scroll; padding: 15px; margin-bottom: 10px; border-radius: 10px; }
-        .controls { display: flex; gap: 10px; width: 90%; max-width: 500px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 10px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #fffef0; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        #status-bar { background: #ffd700; padding: 8px 20px; border-radius: 20px; margin-bottom: 15px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #chat-box { width: 100%; max-width: 500px; height: 400px; border: 2px solid #ffd700; background: white; overflow-y: auto; padding: 15px; margin-bottom: 10px; border-radius: 10px; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); }
+        .controls { display: flex; gap: 8px; width: 100%; max-width: 500px; flex-wrap: wrap; }
+        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        button { padding: 12px 15px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; transition: 0.2s; }
         #send-btn { background-color: #ffd700; color: #333; }
-        #record-btn { background-color: #ff4444; color: white; transition: 0.3s; }
-        #record-btn.recording { background-color: #990000; transform: scale(0.95); }
-        .message { margin-bottom: 15px; padding: 8px; border-radius: 5px; background: #f9f9f9; }
-        audio { display: block; margin-top: 5px; max-width: 100%; }
+        #record-btn { background-color: #ff4444; color: white; }
+        #record-btn.recording { background-color: #990000; animation: pulse 1s infinite; }
+        .message { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: #fcfcfc; border-left: 4px solid #ffd700; }
+        audio { display: block; margin-top: 8px; width: 100%; height: 35px; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
     <h1>Corny Chat 🌽</h1>
 
-    <div id="chat-box">
-        </div>
+    <div id="status-bar">
+        Online: <span id="user-count">0</span> 🌽
+    </div>
+
+    <div id="chat-box"></div>
 
     <div class="controls">
         <input type="text" id="msg-input" placeholder="Type a message...">
@@ -37,25 +42,30 @@
         const msgInput = document.getElementById('msg-input');
         const sendBtn = document.getElementById('send-btn');
         const recordBtn = document.getElementById('record-btn');
+        const userCountDisplay = document.getElementById('user-count');
 
         let mediaRecorder;
         let audioChunks = [];
 
-        // --- TEXT MESSAGE LOGIC ---
+        // --- USER COUNTER ---
+        socket.on('user_count', (data) => {
+            userCountDisplay.innerText = data.count;
+        });
+
+        // --- SEND TEXT ---
         sendBtn.onclick = () => {
-            if (msgInput.value) {
+            if (msgInput.value.trim() !== "") {
                 socket.emit('message', { type: 'text', content: msgInput.value });
                 msgInput.value = '';
             }
         };
 
-        // --- VOICE NOTE LOGIC ---
+        // --- VOICE RECORDING ---
         recordBtn.onmousedown = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
-
                 mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
                 mediaRecorder.onstop = () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
@@ -65,38 +75,33 @@
                         socket.emit('voice_note', { audio: reader.result });
                     };
                 };
-
                 mediaRecorder.start();
                 recordBtn.classList.add('recording');
                 recordBtn.innerText = "Recording...";
-            } catch (err) {
-                alert("Microphone access denied!");
-            }
+            } catch (err) { alert("Mic access required!"); }
         };
 
         recordBtn.onmouseup = () => {
-            if (mediaRecorder) {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
                 recordBtn.classList.remove('recording');
                 recordBtn.innerText = "🎤 Hold to Record";
             }
         };
 
-        // --- RECEIVING MESSAGES ---
+        // --- RECEIVE MESSAGES ---
         socket.on('render_msg', (data) => {
             const div = document.createElement('div');
             div.className = 'message';
-            
             if (data.type === 'text') {
                 div.innerHTML = `<strong>User:</strong> ${data.content}`;
-            } else if (data.type === 'voice') {
+            } else {
                 div.innerHTML = `<strong>User:</strong>`;
                 const audio = document.createElement('audio');
                 audio.src = data.content;
                 audio.controls = true;
                 div.appendChild(audio);
             }
-            
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
         });
