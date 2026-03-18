@@ -6,39 +6,33 @@
     <title>Corny Chat Pro 🌽</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: 'Segoe UI', sans-serif; background: #fffef0; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffd700; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         #main-chat { display: none; width: 100%; max-width: 500px; flex-direction: column; height: 92vh; }
-        
         #chat-box { flex: 1; border: 1px solid #ddd; margin: 10px 0; overflow-y: auto; background: white; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        
-        /* Message Bubbles */
         .message { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; position: relative; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .my-msg { align-self: flex-end; background: #ffd700; color: #222; border-bottom-right-radius: 2px; }
         .other-msg { align-self: flex-start; background: #f1f1f1; color: #333; border-bottom-left-radius: 2px; }
         .system-msg { align-self: center; background: none; color: #aaa; font-size: 11px; font-style: italic; box-shadow: none; }
-        
-        /* Labels & Time */
         .sender-name { font-size: 10px; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.7; }
         .timestamp { font-size: 9px; margin-top: 5px; display: block; text-align: right; opacity: 0.5; }
-
-        /* Functional Areas */
         #typing-status { height: 20px; font-size: 12px; color: #888; font-style: italic; padding-left: 10px; }
         .emoji-bar { display: flex; gap: 12px; margin: 5px 0; padding-left: 5px; font-size: 22px; cursor: pointer; }
-        
         .controls { display: flex; gap: 8px; width: 100%; align-items: center; }
-        input { flex: 1; padding: 12px 18px; border-radius: 25px; border: 1px solid #ccc; outline: none; font-size: 14px; }
-        button { padding: 10px 20px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #ffcc00; transform: scale(1.05); }
+        input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
+        button { padding: 10px 15px; border-radius: 25px; border: none; background: #ffd700; font-weight: bold; cursor: pointer; }
         .logout-btn { background: #ff4444; color: white; padding: 6px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; }
+        #record-btn.recording { background: #ff4444; color: white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        audio { width: 200px; height: 35px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="font-size: 2.5em;">Corny Chat 🌽</h1>
-        <input type="text" id="username-input" placeholder="Enter your name..." style="max-width: 250px;">
-        <button onclick="joinChat()" style="margin-top:15px; width: 250px;">Start Chatting</button>
+        <h1>Corny Chat 🌽</h1>
+        <input type="text" id="username-input" placeholder="Your name...">
+        <button onclick="joinChat()" style="margin-top:15px;">Start Chatting</button>
     </div>
 
     <div id="main-chat">
@@ -46,22 +40,18 @@
             <span style="color: #666; font-weight: bold;">🌽 Online: <span id="user-count">0</span></span>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
-        
         <div id="chat-box"></div>
-        
         <div id="typing-status"></div>
-        
         <div class="emoji-bar">
             <span onclick="addEmoji('🌽')">🌽</span>
             <span onclick="addEmoji('❤️')">❤️</span>
             <span onclick="addEmoji('😂')">😂</span>
             <span onclick="addEmoji('🔥')">🔥</span>
-            <span onclick="addEmoji('🙌')">🙌</span>
         </div>
-
         <div class="controls">
             <input type="text" id="msg-input" placeholder="Message..." oninput="broadcastTyping()" onkeypress="if(event.key==='Enter')sendText()">
             <button onclick="sendText()">Send</button>
+            <button id="record-btn">🎤</button>
         </div>
     </div>
 
@@ -71,10 +61,12 @@
         const loginScreen = document.getElementById('login-screen');
         const mainChat = document.getElementById('main-chat');
         const typingStatus = document.getElementById('typing-status');
+        const recordBtn = document.getElementById('record-btn');
         let myName = localStorage.getItem('corny_name');
         let typeTimer;
+        let mediaRecorder;
+        let chunks = [];
 
-        // 1. Setup UI
         if (myName) {
             loginScreen.style.display = 'none';
             mainChat.style.display = 'flex';
@@ -82,25 +74,18 @@
         }
 
         const savedHistory = localStorage.getItem('chat_history');
-        if (savedHistory) { 
-            chatBox.innerHTML = savedHistory; 
-            chatBox.scrollTop = chatBox.scrollHeight; 
-        }
+        if (savedHistory) { chatBox.innerHTML = savedHistory; chatBox.scrollTop = chatBox.scrollHeight; }
 
-        // 2. Typing Logic
         function broadcastTyping() {
             socket.emit('typing', { user: myName, isTyping: true });
             clearTimeout(typeTimer);
-            typeTimer = setTimeout(() => {
-                socket.emit('typing', { user: myName, isTyping: false });
-            }, 2000);
+            typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
         }
 
         socket.on('display_typing', (data) => {
             typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
         });
 
-        // 3. Messaging Logic
         function addEmoji(emoji) {
             document.getElementById('msg-input').value += emoji;
             document.getElementById('msg-input').focus();
@@ -110,11 +95,7 @@
             const input = document.getElementById('msg-input');
             if (input.value.trim()) {
                 const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                socket.emit('message', { 
-                    content: input.value, 
-                    user: myName, 
-                    time: timeStr 
-                });
+                socket.emit('message', { content: input.value, user: myName, time: timeStr });
                 input.value = '';
                 socket.emit('typing', { user: myName, isTyping: false });
             }
@@ -129,19 +110,47 @@
                 const isMe = data.user === myName;
                 div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
                 const displayTime = data.time || "Just now";
+                const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
                 
-                div.innerHTML = `
-                    <span class="sender-name">${isMe ? 'You' : data.user}</span>
-                    <div>${data.content}</div>
-                    <span class="timestamp">${displayTime}</span>
-                `;
+                if (data.type === 'text') {
+                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${displayTime}</span>`;
+                } else {
+                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${displayTime}</span>`;
+                }
             }
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
             localStorage.setItem('chat_history', chatBox.innerHTML);
         });
 
-        // 4. Identity Logic
+        // --- Voice Recording Logic ---
+        recordBtn.onmousedown = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
+                    };
+                };
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+            } catch (err) { alert("Mic access denied"); }
+        };
+
+        recordBtn.onmouseup = () => {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+            }
+        };
+
         function joinChat() {
             const val = document.getElementById('username-input').value.trim();
             if (val) {
