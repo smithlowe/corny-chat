@@ -53,135 +53,134 @@
         </div>
     </div>
 
-    <script>
-        const socket = io({ transports: ["websocket", "polling"] });
-        const chatBox = document.getElementById('chat-box');
-        const loginScreen = document.getElementById('login-screen');
-        const mainChat = document.getElementById('main-chat');
-        const typingStatus = document.getElementById('typing-status');
-        const recordBtn = document.getElementById('record-btn');
-        let myName = localStorage.getItem('corny_name');
-        let typeTimer, mediaRecorder, chunks = [];
+   <script>
+    const socket = io({ transports: ["websocket", "polling"] });
+    const chatBox = document.getElementById('chat-box');
+    const loginScreen = document.getElementById('login-screen');
+    const mainChat = document.getElementById('main-chat');
+    const typingStatus = document.getElementById('typing-status');
+    const recordBtn = document.getElementById('record-btn');
+    let myName = localStorage.getItem('corny_name');
+    let typeTimer, mediaRecorder, chunks = [];
 
-        // LOAD HISTORY AND LOGIN STATE
-        window.onload = () => {
-            const savedHistory = localStorage.getItem('chat_history');
-            if (savedHistory) {
-                chatBox.innerHTML = savedHistory;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-            if (myName) {
-                loginScreen.style.display = 'none';
-                mainChat.style.display = 'flex';
-                socket.emit('user_joined', { name: myName });
-            }
-        };
-
-        socket.on('user_count', (data) => {
-            document.getElementById('user-count').innerText = data.count;
-        });
-
-        function addEmoji(emoji) { 
-            const input = document.getElementById('msg-input');
-            input.value += emoji; 
-            input.focus(); 
-        }
-
-        function broadcastTyping() {
-            socket.emit('typing', { user: myName, isTyping: true });
-            clearTimeout(typeTimer);
-            typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
-        }
-
-        socket.on('display_typing', (data) => {
-            typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
-        });
-
-        function sendText() {
-            const input = document.getElementById('msg-input');
-            if (input.value.trim()) {
-                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                socket.emit('message', { content: input.value, user: myName, time: timeStr });
-                input.value = '';
-                socket.emit('typing', { user: myName, isTyping: false });
-            }
-        }
-
-        socket.on('render_msg', (data) => {
-            const div = document.createElement('div');
-            if (data.user === 'System') {
-                div.className = 'message system-msg';
-                div.innerText = data.content;
-            } else {
-                const isMe = data.user === myName;
-                div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
-                const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
-                const displayTime = data.time || "Just now";
-                
-                if (data.type === 'text') {
-                    div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${displayTime}</span>`;
-                } else {
-                    div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${displayTime}</span>`;
-                }
-            }
-            chatBox.appendChild(div);
+    // 1. UPDATED LOAD LOGIC (The "Quiet" Fix)
+    window.onload = () => {
+        const savedHistory = localStorage.getItem('chat_history');
+        if (savedHistory) {
+            chatBox.innerHTML = savedHistory;
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        
+        if (myName) {
+            loginScreen.style.display = 'none';
+            mainChat.style.display = 'flex';
             
-            // PERSISTENCE: Save the new bubble to local memory
-            localStorage.setItem('chat_history', chatBox.innerHTML);
-        });
+            // Check if we already announced ourselves in this specific tab session
+            if (!sessionStorage.getItem('announced_presence')) {
+                socket.emit('user_joined', { name: myName });
+                sessionStorage.setItem('announced_presence', 'true');
+            }
+        }
+    };
 
-        async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                chunks = [];
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = () => {
-                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
-                    };
+    socket.on('user_count', (data) => {
+        document.getElementById('user-count').innerText = data.count;
+    });
+
+    function addEmoji(emoji) { 
+        const input = document.getElementById('msg-input');
+        input.value += emoji; 
+        input.focus(); 
+    }
+
+    function broadcastTyping() {
+        socket.emit('typing', { user: myName, isTyping: true });
+        clearTimeout(typeTimer);
+        typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
+    }
+
+    socket.on('display_typing', (data) => {
+        typingStatus.innerText = data.isTyping ? `${data.user} is typing...` : "";
+    });
+
+    function sendText() {
+        const input = document.getElementById('msg-input');
+        if (input.value.trim()) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            socket.emit('message', { content: input.value, user: myName, time: timeStr });
+            input.value = '';
+            socket.emit('typing', { user: myName, isTyping: false });
+        }
+    }
+
+    socket.on('render_msg', (data) => {
+        const div = document.createElement('div');
+        if (data.user === 'System') {
+            div.className = 'message system-msg';
+            div.innerText = data.content;
+        } else {
+            const isMe = data.user === myName;
+            div.className = `message ${isMe ? 'my-msg' : 'other-msg'}`;
+            const nameTag = `<span class="sender-name">${isMe ? 'You' : data.user}</span>`;
+            const displayTime = data.time || "Just now";
+            
+            if (data.type === 'text') {
+                div.innerHTML = `${nameTag}<div>${data.content}</div><span class="timestamp">${displayTime}</span>`;
+            } else {
+                div.innerHTML = `${nameTag}<audio src="${data.content}" controls></audio><span class="timestamp">${displayTime}</span>`;
+            }
+        }
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        localStorage.setItem('chat_history', chatBox.innerHTML);
+    });
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            chunks = [];
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = () => {
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    socket.emit('voice_note', { audio: reader.result, user: myName, time: timeStr });
                 };
-                mediaRecorder.start();
-                recordBtn.classList.add('recording');
-            } catch (err) { alert("Enable Microphone Access!"); }
-        }
+            };
+            mediaRecorder.start();
+            recordBtn.classList.add('recording');
+        } catch (err) { alert("Enable Microphone Access!"); }
+    }
 
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
-            recordBtn.classList.remove('recording');
-        }
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+        recordBtn.classList.remove('recording');
+    }
 
-        // Mouse Events
-        recordBtn.addEventListener('mousedown', startRecording);
-        recordBtn.addEventListener('mouseup', stopRecording);
-        recordBtn.addEventListener('mouseleave', stopRecording);
-        // Mobile Touch Events
-        recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
-        recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+    recordBtn.addEventListener('mousedown', startRecording);
+    recordBtn.addEventListener('mouseup', stopRecording);
+    recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+    recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 
-        function joinChat() {
-            const val = document.getElementById('username-input').value.trim();
-            if (val) {
-                myName = val;
-                localStorage.setItem('corny_name', val);
-                loginScreen.style.display = 'none';
-                mainChat.style.display = 'flex';
-                socket.emit('user_joined', { name: val });
-            }
+    function joinChat() {
+        const val = document.getElementById('username-input').value.trim();
+        if (val) {
+            myName = val;
+            localStorage.setItem('corny_name', val);
+            sessionStorage.setItem('announced_presence', 'true');
+            loginScreen.style.display = 'none';
+            mainChat.style.display = 'flex';
+            socket.emit('user_joined', { name: val });
         }
+    }
 
-        function logout() { 
-            localStorage.removeItem('chat_history'); 
-            localStorage.removeItem('corny_name'); 
-            location.reload(); 
-        }
-    </script>
-</body>
+    function logout() { 
+        localStorage.clear(); 
+        sessionStorage.clear();
+        location.reload(); 
+    }
+</script></body>
 </html>
