@@ -1,110 +1,46 @@
-import os
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template
+from flask_socketio import SocketIO, emit, join_room
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'med_secret_123'
+app.config['SECRET_KEY'] = 'medical-secret!'
+# Allow connections from your Render URL
 socketio = SocketIO(app, cors_allowed_origins="*")
-
-# This stores everyone currently in the clinic
-active_users = {}
 
 @app.route('/')
 def index():
+    # Flask looks inside the /templates folder for this
     return render_template('index.html')
 
-# --- THE CLINIC SWITCHBOARD HELPER ---
-def emit_user_update():
-    """Updates the Doctor's sidebar with the current patient list"""
-    users_list = []
-    for sid, info in active_users.items():
-        users_list.append({
-            'name': info.get('name'),
-            'role': info.get('role'),
-            'sid': sid
-        })
+@socketio.on('join')
+def on_join(data):
+    username = data.get('name')
+    hospital = data.get('hospital')
+    doctor = data.get('doctorName')
     
-    socketio.emit('user_count', {
-        'count': len(active_users),
-        'users_list': users_list
-    })
-
-# --- EVENT HANDLERS ---
-
-@socketio.on('user_joined')
-def handle_user_joined(data):
-    active_users[request.sid] = {
-        'name': data.get('name'),
-        'role': data.get('role')
-    }
-    emit('render_msg', {
+    # Create a unique room ID (e.g., mulago_dr-lawrence)
+    room = f"{hospital}_{doctor}".lower().replace(" ", "_")
+    
+    join_room(room)
+    print(f"✅ {username} joined medical room: {room}")
+    
+    # Send a welcome message to just that user
+    emit('receive_message', {
         'user': 'System',
-        'content': f'Welcome to Corny-Comm, {data.get("name")}! Your session is secure.',
-        'time': ''
+        'message': f'Connected to {hospital} secure line. Private room: {room}',
+        'timestamp': 'System'
     })
-    emit_user_update()
-    socketio.emit('user_count', {'count': len(active_users)}, broadcast=True)
 
-@socketio.on('message')
+@socketio.on('send_message')
 def handle_message(data):
-    sender_sid = request.sid
-    sender_info = active_users.get(sender_sid, {})
-    sender_role = sender_info.get('role', 'Patient')
-    target_sid = data.get('target')
+    # In a real app, we'd store the room on the session. 
+    # For this version, we broadcast to the specific room the user is in.
+    room = f"{data.get('hospital')}_{data.get('doctorName')}".lower().replace(" ", "_")
+    emit('receive_message', data, room=room)
 
-    message_packet = {
-        'user': data['user'],
-        'content': data['content'],
-        'time': data['time'],
-        'sender_role': sender_role
-    }
+@socketio.on('typing')
+def handle_typing(data):
+    room = f"{data.get('hospital')}_{data.get('doctorName')}".lower().replace(" ", "_")
+    emit('display_typing', data, room=room, include_self=False)
 
-    if sender_role == 'Doctor' and target_sid:
-        emit('render_msg', message_packet, room=target_sid)
-        emit('render_msg', message_packet, room=sender_sid)
-    elif sender_role == 'Patient':
-        for sid, info in active_users.items():
-            if info.get('role') == 'Doctor' or sid == sender_sid:
-                emit('render_msg', message_packet, room=sid)
-
-@socketio.on('voice_note')
-def handle_voice(data):
-    target_sid = data.get('target')
-    sender_sid = request.sid
-    sender_role = active_users.get(sender_sid, {}).get('role', 'Patient')
-    
-    packet = {
-        'user': data['user'],
-        'content': data['audio'],
-        'time': data['time'],
-        'type': 'voice',
-        'sender_role': sender_role
-    }
-    
-    if sender_role == 'Doctor' and target_sid:
-        emit('render_msg', packet, room=target_sid)
-        emit('render_msg', packet, room=sender_sid)
-    elif sender_role == 'Patient':
-        for sid, info in active_users.items():
-            if info.get('role') == 'Doctor' or sid == sender_sid:
-                emit('render_msg', packet, room=sid)
-
-@socketio.on('emergency_alert')
-def handle_emergency(data):
-    # Sends a signal to EVERYONE; frontend logic shows it only to Doctors
-    emit('doctor_alert', {
-        'user': data['user'],
-        'time': data['time']
-    }, broadcast=True)
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    if request.sid in active_users:
-        active_users.pop(request.sid)
-        emit_user_update()
-        socketio.emit('user_count', {'count': len(active_users)}, broadcast=True)
-
-# 🚦 THE IGNITION SWITCH - ALWAYS AT THE VERY END 🚦
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host='0.0.0.0', port=port)
+    socketio.run(app)
