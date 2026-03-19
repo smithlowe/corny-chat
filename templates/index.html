@@ -7,147 +7,159 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #login-container { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; width: 320px; }
-        .logo-icon { font-size: 3.5rem; margin-bottom: 10px; }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 25px; box-sizing: border-box; outline: none; }
-        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        button:hover { background: #0056b3; }
-        
-        #chat-container { 
-            display: none; 
-            flex-direction: column; 
-            height: 100dvh; 
-            width: 100%; 
-            max-width: 600px; 
-            background: white; 
-            position: fixed; 
-            top: 0; 
-            z-index: 10; 
-        }
+        #login-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; width: 320px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 25px; outline: none; }
+        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; }
+        #doctor-list-section { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .doc-btn { background: #28a745; margin-bottom: 5px; font-size: 0.9em; }
+        #chat-container { display: none; flex-direction: column; height: 100dvh; width: 100%; max-width: 600px; background: white; position: fixed; top: 0; z-index: 10; }
         #messages { flex: 1; overflow-y: auto; padding: 20px; background: #f9f9f9; display: flex; flex-direction: column; }
         .message { margin-bottom: 15px; padding: 10px 15px; border-radius: 15px; max-width: 80%; }
         .my-msg { background: #007bff; color: white; align-self: flex-end; }
         .other-msg { background: #e9ecef; align-self: flex-start; }
-        
-        #input-area { 
-            padding: 20px; 
-            border-top: 1px solid #eee; 
-            display: flex; 
-            gap: 10px; 
-            background: #ffffff;
-            padding-bottom: env(safe-area-inset-bottom, 30px); 
-        }
+        #input-area { padding: 20px; border-top: 1px solid #eee; display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 30px); }
     </style>
 </head>
 <body>
 
     <div id="login-container">
-        <div class="logo-icon">🏥</div>
+        <div style="font-size: 3rem;">🏥</div>
         <h2>Corny-Comm</h2>
-        <p>Medical Consultation Portal</p>
-        
-        <input type="text" id="username" placeholder="Your Full Name">
-        
-        <!-- Role Selection -->
+        <input type="text" id="username" placeholder="Your Name">
         <select id="role" onchange="togglePasscode()">
             <option value="Patient">Patient</option>
-            <option value="Doctor">Doctor (Authorized)</option>
-            <option value="Developer">Developer</option>
+            <option value="Doctor">Doctor</option>
         </select>
-
-        <!-- Hidden Passcode Input -->
-        <input type="password" id="accessCode" placeholder="Authorization Code" style="display:none;">
-
+        <input type="password" id="accessCode" placeholder="Passcode" style="display:none;">
         <select id="hospital">
-            <option value="Mulago">Mulago National Hospital</option>
+            <option value="Mulago">Mulago Hospital</option>
             <option value="Nakasero">Nakasero Hospital</option>
-            <option value="Mukono">Mukono Health Centre IV</option>
         </select>
+        <button id="main-btn" onclick="joinClinic()">JOIN HOSPITAL LOBBY</button>
         
-        <input type="text" id="targetDoctor" placeholder="Doctor's Name">
-        <button onclick="joinClinic()">START CONSULTATION</button>
+        <div id="doctor-list-section" style="display:none;">
+            <p><small>Available Doctors:</small></p>
+            <div id="doctor-buttons"></div>
+        </div>
     </div>
 
     <div id="chat-container">
-        <div style="background: #007bff; color: white; padding: 15px; text-align: center;">
-            <h3 id="header-title" style="margin:0;">Consultation</h3>
+        <div style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between;">
+            <span id="header-title">Consultation</span>
+            <button onclick="location.reload()" style="width: auto; background: red; padding: 5px 10px;">End</button>
         </div>
         <div id="messages"></div>
         <div id="input-area">
             <input type="text" id="messageInput" placeholder="Type a message...">
-            <button onclick="sendMessage()" style="width: auto; margin:0;">Send</button>
+            <button onclick="sendMessage()" style="width: auto;">Send</button>
         </div>
     </div>
 
     <script>
-        const socket = io();
-        let myName, myHospital, myDoctor;
+    const socket = io();
+    let myName, myHospital, myDoctor, myRole;
 
-        function togglePasscode() {
-            const role = document.getElementById('role').value;
-            const codeInput = document.getElementById('accessCode');
-            codeInput.style.display = (role === 'Doctor' || role === 'Developer') ? 'block' : 'none';
+    function togglePasscode() {
+        const role = document.getElementById('role').value;
+        document.getElementById('accessCode').style.display = (role === 'Doctor') ? 'block' : 'none';
+    }
+
+    async function joinClinic() {
+        myName = document.getElementById('username').value;
+        myHospital = document.getElementById('hospital').value;
+        myRole = document.getElementById('role').value;
+        const code = document.getElementById('accessCode').value;
+
+        if (!myName) return alert("Enter your name");
+
+        if (myRole === 'Doctor') {
+            const res = await fetch('/verify-code', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({hospital: myHospital, code: code})
+            });
+            const data = await res.json();
+            if (!data.success) return alert("Invalid Code");
+            myDoctor = myName; // Doctor is their own "target"
         }
 
-        async function joinClinic() {
-            myName = document.getElementById('username').value;
-            myHospital = document.getElementById('hospital').value;
-            myDoctor = document.getElementById('targetDoctor').value;
-            const role = document.getElementById('role').value;
-            const code = document.getElementById('accessCode').value;
+        socket.emit('join', {name: myName, hospital: myHospital, role: myRole});
+        document.getElementById('main-btn').innerText = "Logged into Lobby";
+        document.getElementById('main-btn').disabled = true; // Prevent double-joining
+        
+        if(myRole === 'Patient') {
+            document.getElementById('doctor-list-section').style.display = 'block';
+        }
+    }
 
-            if (!myName || !myDoctor) return alert("Please fill in all fields");
+    socket.on('update_doctor_list', (doctors) => {
+        const container = document.getElementById('doctor-buttons');
+        container.innerHTML = "";
+        
+        if (doctors.length === 0) {
+            container.innerHTML = "<small style='color:gray;'>Waiting for doctors to come online...</small>";
+        }
 
-            if (role === 'Doctor' || role === 'Developer') {
-                const response = await fetch('/verify-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        hospital: (role === 'Developer' ? 'Developer' : myHospital), 
-                        code: code 
-                    })
-                });
+        doctors.forEach(doc => {
+            const btn = document.createElement('button');
+            btn.className = "doc-btn";
+            btn.innerText = "Consult " + doc;
+            btn.onclick = () => {
+                myDoctor = doc;
+                // Disable all buttons so patient waits for this specific one
+                const allBtns = document.querySelectorAll('.doc-btn');
+                allBtns.forEach(b => b.disabled = true);
+                btn.innerText = "Request Sent...";
+                socket.emit('request_consultation', {patient: myName, doctor: doc, hospital: myHospital});
+            };
+            container.appendChild(btn);
+        });
+    });
 
-                const result = await response.json();
-                if (!result.success) {
-                    return alert("❌ Invalid Authorization Code for " + myHospital);
-                }
+    socket.on('consultation_request', (data) => {
+        // Only the specific doctor named in the request should see this
+        if (myRole === 'Doctor' && myName === data.doctor) {
+            if (confirm(`Patient ${data.patient} is requesting a consultation. Accept?`)) {
+                socket.emit('accept_patient', {doctor: myName, hospital: myHospital, patient: data.patient});
             }
+        }
+    });
 
+    socket.on('start_session', (data) => {
+        // Check if I am the doctor or the patient who requested this doctor
+        if ((myRole === 'Doctor' && myName === data.doctor) || 
+            (myRole === 'Patient' && myDoctor === data.doctor && myName === data.patient)) {
+            
             document.getElementById('login-container').style.display = 'none';
             document.getElementById('chat-container').style.display = 'flex';
-            document.getElementById('header-title').innerText = myHospital + " - " + myName;
-
-            socket.emit('join', { name: myName, hospital: myHospital, doctorName: myDoctor });
+            document.getElementById('header-title').innerText = "Chatting with " + (myRole === 'Doctor' ? data.patient : data.doctor);
         }
+    });
 
-        function sendMessage() {
-            const inp = document.getElementById('messageInput');
-            if (!inp.value) return;
+    function sendMessage() {
+        const inp = document.getElementById('messageInput');
+        if (!inp.value) return;
+        
+        socket.emit('send_message', {
+            user: myName, 
+            message: inp.value, 
+            hospital: myHospital, 
+            doctorName: myDoctor, // This acts as the room ID
+            timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        });
+        inp.value = "";
+    }
 
-            socket.emit('send_message', {
-                user: myName,
-                message: inp.value,
-                hospital: myHospital,
-                doctorName: myDoctor,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
-            inp.value = "";
-        }
-
-        socket.on('receive_message', (data) => {
+    socket.on('receive_message', (data) => {
+        // Security: Only show messages if they belong to this doctor-patient pair
+        if (data.doctorName === myDoctor) {
             const div = document.createElement('div');
             div.className = `message ${data.user === myName ? 'my-msg' : 'other-msg'}`;
-            div.innerHTML = `<b>${data.user}:</b> ${data.message} <br><small>${data.timestamp}</small>`;
-            const msgs = document.getElementById('messages');
-            msgs.appendChild(div);
-            msgs.scrollTop = msgs.scrollHeight;
-        });
-
-        // Press Enter to send
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-    </script>
+            div.innerHTML = `<b>${data.user}:</b> ${data.message} <br><small style='opacity:0.6; font-size:0.7em;'>${data.timestamp || ''}</small>`;
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+    });
+</script>
 </body>
 </html>
