@@ -13,13 +13,30 @@
         button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
         button:hover { background: #0056b3; }
         
-        /* CHAT WINDOW (Hidden until Login) */
-        #chat-container { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 600px; background: white; position: fixed; top: 0; z-index: 10; }
+        #chat-container { 
+            display: none; 
+            flex-direction: column; 
+            height: 100dvh; 
+            width: 100%; 
+            max-width: 600px; 
+            background: white; 
+            position: fixed; 
+            top: 0; 
+            z-index: 10; 
+        }
         #messages { flex: 1; overflow-y: auto; padding: 20px; background: #f9f9f9; display: flex; flex-direction: column; }
         .message { margin-bottom: 15px; padding: 10px 15px; border-radius: 15px; max-width: 80%; }
         .my-msg { background: #007bff; color: white; align-self: flex-end; }
         .other-msg { background: #e9ecef; align-self: flex-start; }
-        #input-area { padding: 20px; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        
+        #input-area { 
+            padding: 20px; 
+            border-top: 1px solid #eee; 
+            display: flex; 
+            gap: 10px; 
+            background: #ffffff;
+            padding-bottom: env(safe-area-inset-bottom, 30px); 
+        }
     </style>
 </head>
 <body>
@@ -28,12 +45,25 @@
         <div class="logo-icon">🏥</div>
         <h2>Corny-Comm</h2>
         <p>Medical Consultation Portal</p>
+        
         <input type="text" id="username" placeholder="Your Full Name">
+        
+        <!-- Role Selection -->
+        <select id="role" onchange="togglePasscode()">
+            <option value="Patient">Patient</option>
+            <option value="Doctor">Doctor (Authorized)</option>
+            <option value="Developer">Developer</option>
+        </select>
+
+        <!-- Hidden Passcode Input -->
+        <input type="password" id="accessCode" placeholder="Authorization Code" style="display:none;">
+
         <select id="hospital">
             <option value="Mulago">Mulago National Hospital</option>
             <option value="Nakasero">Nakasero Hospital</option>
             <option value="Mukono">Mukono Health Centre IV</option>
         </select>
+        
         <input type="text" id="targetDoctor" placeholder="Doctor's Name">
         <button onclick="joinClinic()">START CONSULTATION</button>
     </div>
@@ -43,7 +73,6 @@
             <h3 id="header-title" style="margin:0;">Consultation</h3>
         </div>
         <div id="messages"></div>
-        <div id="typing-status" style="padding: 5px 20px; font-size: 0.8em; color: gray;"></div>
         <div id="input-area">
             <input type="text" id="messageInput" placeholder="Type a message...">
             <button onclick="sendMessage()" style="width: auto; margin:0;">Send</button>
@@ -54,19 +83,41 @@
         const socket = io();
         let myName, myHospital, myDoctor;
 
-        function joinClinic() {
+        function togglePasscode() {
+            const role = document.getElementById('role').value;
+            const codeInput = document.getElementById('accessCode');
+            codeInput.style.display = (role === 'Doctor' || role === 'Developer') ? 'block' : 'none';
+        }
+
+        async function joinClinic() {
             myName = document.getElementById('username').value;
             myHospital = document.getElementById('hospital').value;
             myDoctor = document.getElementById('targetDoctor').value;
+            const role = document.getElementById('role').value;
+            const code = document.getElementById('accessCode').value;
 
-            if (!myName || !myDoctor) return alert("Fill in all fields");
+            if (!myName || !myDoctor) return alert("Please fill in all fields");
 
-            // Switch UI
+            if (role === 'Doctor' || role === 'Developer') {
+                const response = await fetch('/verify-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        hospital: (role === 'Developer' ? 'Developer' : myHospital), 
+                        code: code 
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    return alert("❌ Invalid Authorization Code for " + myHospital);
+                }
+            }
+
             document.getElementById('login-container').style.display = 'none';
             document.getElementById('chat-container').style.display = 'flex';
             document.getElementById('header-title').innerText = myHospital + " - " + myName;
 
-            // Tell Python we joined
             socket.emit('join', { name: myName, hospital: myHospital, doctorName: myDoctor });
         }
 
@@ -88,8 +139,14 @@
             const div = document.createElement('div');
             div.className = `message ${data.user === myName ? 'my-msg' : 'other-msg'}`;
             div.innerHTML = `<b>${data.user}:</b> ${data.message} <br><small>${data.timestamp}</small>`;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            const msgs = document.getElementById('messages');
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        });
+
+        // Press Enter to send
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
         });
     </script>
 </body>
