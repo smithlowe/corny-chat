@@ -7,16 +7,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #login-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; width: 320px; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 25px; outline: none; }
-        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; }
+        #login-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; width: 340px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 25px; outline: none; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        #logout-btn { background: #6c757d; display: none; }
         #doctor-list-section { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
         .doc-btn { background: #28a745; margin-bottom: 5px; font-size: 0.9em; }
         #chat-container { display: none; flex-direction: column; height: 100dvh; width: 100%; max-width: 600px; background: white; position: fixed; top: 0; z-index: 10; }
         #messages { flex: 1; overflow-y: auto; padding: 20px; background: #f9f9f9; display: flex; flex-direction: column; }
-        .message { margin-bottom: 15px; padding: 10px 15px; border-radius: 15px; max-width: 80%; }
+        .message { margin-bottom: 15px; padding: 10px 15px; border-radius: 15px; max-width: 80%; line-height: 1.4; }
         .my-msg { background: #007bff; color: white; align-self: flex-end; }
-        .other-msg { background: #e9ecef; align-self: flex-start; }
+        .other-msg { background: #e9ecef; align-self: flex-start; color: #333; }
         #input-area { padding: 20px; border-top: 1px solid #eee; display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 30px); }
     </style>
 </head>
@@ -24,7 +25,7 @@
 
     <div id="login-container">
         <div style="font-size: 3rem;">🏥</div>
-        <h2>Corny-Comm</h2>
+        <h2 style="margin: 10px 0;">Corny-Comm</h2>
         <input type="text" id="username" placeholder="Your Name">
         <select id="role" onchange="togglePasscode()">
             <option value="Patient">Patient</option>
@@ -37,24 +38,25 @@
             <option value="Mukono">Mukono Hospital</option>
         </select>
         <button id="main-btn" onclick="joinClinic()">JOIN HOSPITAL LOBBY</button>
+        <button id="logout-btn" onclick="doctorLogout()">LOG OUT (GO OFFLINE)</button>
         
         <div id="doctor-list-section" style="display:none;">
-            <p><small>Available Doctors:</small></p>
+            <p><small style="color: #666;">Available Doctors:</small></p>
             <div id="doctor-buttons"></div>
         </div>
     </div>
 
     <div id="chat-container">
         <div style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <span id="header-title">Consultation</span>
-            <button onclick="endConsultation()" style="width: auto; background: #dc3545; padding: 5px 15px; border-radius: 20px; font-size: 0.8em;">
+            <span id="header-title" style="font-weight: bold;">Consultation</span>
+            <button onclick="endConsultation()" style="width: auto; background: #dc3545; padding: 5px 15px; border-radius: 20px; font-size: 0.8em; margin: 0;">
                 END SESSION
             </button>
         </div>
         <div id="messages"></div>
         <div id="input-area">
             <input type="text" id="messageInput" placeholder="Type a message...">
-            <button onclick="sendMessage()" style="width: auto;">Send</button>
+            <button onclick="sendMessage()" style="width: auto; padding: 0 20px;">Send</button>
         </div>
     </div>
 
@@ -74,17 +76,22 @@
                 myRole = savedRole;
                 myDoctor = savedDoctor;
 
+                // UI setup for persistent login
+                document.getElementById('username').value = myName;
+                document.getElementById('hospital').value = myHospital;
+                document.getElementById('role').value = myRole;
+                document.getElementById('main-btn').innerText = "Logged in as " + myRole;
+                document.getElementById('main-btn').disabled = true;
+                
+                if(myRole === 'Doctor') document.getElementById('logout-btn').style.display = 'block';
+                if(myRole === 'Patient') document.getElementById('doctor-list-section').style.display = 'block';
+
                 socket.emit('join', {
-                    name: myName, 
-                    hospital: myHospital, 
-                    role: myRole, 
-                    doctor_name: myDoctor
+                    name: myName, hospital: myHospital, role: myRole, doctor_name: myDoctor
                 });
                 
-                if (myDoctor && myDoctor !== "null") {
-                    document.getElementById('login-container').style.display = 'none';
-                    document.getElementById('chat-container').style.display = 'flex';
-                    document.getElementById('header-title').innerText = "Session: " + myDoctor;
+                if (myDoctor && myDoctor !== "null" && myDoctor !== "undefined") {
+                    showChatView(myDoctor);
                 }
             }
         };
@@ -110,7 +117,8 @@
                 });
                 const data = await res.json();
                 if (!data.success) return alert("Invalid Code");
-                myDoctor = myName; 
+                myDoctor = myName;
+                document.getElementById('logout-btn').style.display = 'block';
             }
 
             localStorage.setItem('corny_name', myName);
@@ -120,14 +128,22 @@
 
             socket.emit('join', {name: myName, hospital: myHospital, role: myRole, doctor_name: myDoctor});
             
-            document.getElementById('main-btn').innerText = "Logged into Lobby";
+            document.getElementById('main-btn').innerText = "In Lobby as " + myRole;
             document.getElementById('main-btn').disabled = true;
             if(myRole === 'Patient') document.getElementById('doctor-list-section').style.display = 'block';
         }
 
+        function doctorLogout() {
+            if(confirm("Log out? You will be marked as offline.")) {
+                socket.emit('doctor_logout', {hospital: myHospital, name: myName});
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
         socket.on('update_doctor_list', (doctors) => {
             const container = document.getElementById('doctor-buttons');
-            container.innerHTML = "";
+            container.innerHTML = doctors.length ? "" : "<small style='color:gray;'>No doctors available...</small>";
             doctors.forEach(doc => {
                 const btn = document.createElement('button');
                 btn.className = "doc-btn";
@@ -136,7 +152,8 @@
                     myDoctor = doc;
                     localStorage.setItem('corny_doctor', doc);
                     socket.emit('request_consultation', {patient: myName, doctor: doc, hospital: myHospital});
-                    btn.innerText = "Waiting for Doctor...";
+                    btn.innerText = "Requesting...";
+                    btn.disabled = true;
                 };
                 container.appendChild(btn);
             });
@@ -153,11 +170,15 @@
         socket.on('start_session', (data) => {
             if ((myRole === 'Doctor' && myName === data.doctor) || 
                 (myRole === 'Patient' && myDoctor === data.doctor && myName === data.patient)) {
-                document.getElementById('login-container').style.display = 'none';
-                document.getElementById('chat-container').style.display = 'flex';
-                document.getElementById('header-title').innerText = "Chatting with " + (myRole === 'Doctor' ? data.patient : data.doctor);
+                showChatView(myRole === 'Doctor' ? data.patient : data.doctor);
             }
         });
+
+        function showChatView(titleName) {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('chat-container').style.display = 'flex';
+            document.getElementById('header-title').innerText = "Session: " + titleName;
+        }
 
         socket.on('load_history', (messages) => {
             const container = document.getElementById('messages');
@@ -167,12 +188,9 @@
 
         function sendMessage() {
             const inp = document.getElementById('messageInput');
-            if (!inp.value) return;
+            if (!inp.value.trim()) return;
             socket.emit('send_message', {
-                user: myName, 
-                message: inp.value, 
-                hospital: myHospital, 
-                doctorName: myDoctor
+                user: myName, message: inp.value, hospital: myHospital, doctorName: myDoctor
             });
             inp.value = "";
         }
@@ -192,7 +210,7 @@
         }
 
         function endConsultation() {
-            if(confirm("End session for both?")) {
+            if(confirm("End session? You will remain in the lobby.")) {
                 socket.emit('end_session_global', {hospital: myHospital, doctor: myDoctor});
             }
         }
@@ -200,7 +218,7 @@
         socket.on('force_exit_session', (data) => {
             if (myDoctor === data.doctor) {
                 localStorage.removeItem('corny_doctor');
-                location.reload();
+                location.reload(); // Returns to lobby while keeping credentials
             }
         });
     </script>
