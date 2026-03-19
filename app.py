@@ -1,9 +1,19 @@
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit, join_room, leave_room
+import os
+from flask import Flask, render_template, request, jsonify  # Added request and jsonify
+from flask_socketio import SocketIO, emit, join_room      # Added join_room
+from supabase import create_client, Client 
 
 app = Flask(__name__)
+
+# --- DATABASE CONNECTION ---
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
 app.config['SECRET_KEY'] = 'medical-secret-2026'
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# ... rest of your code ...
 
 # 🔑 HOSPITAL PASSCODE REGISTRY
 HOSPITAL_CODES = {
@@ -80,12 +90,21 @@ def handle_accept(data):
         'doctor': doctor, 
         'patient': patient
     }, room=hospital)
-
 @socketio.on('send_message')
 def handle_message(data):
-    # We use the hospital name as a general broadcast, 
-    # but the frontend will filter based on the 'doctorName'
-    emit('receive_message', data, room=data['hospital'])
+    # 1. Save to Supabase (The "Permanent" part)
+    try:
+        supabase.table("messages").insert({
+            "sender": data['user'],
+            "hospital": data['hospital'],
+            "doctor_name": data.get('doctorName', 'General'), # Safety check
+            "content": data['message']
+        }).execute()
+    except Exception as e:
+        print(f"Database Error: {e}")
+
+    # 2. Send live to everyone (The "Chat" part)
+    emit('receive_message', data, broadcast=True)
 
 @socketio.on('disconnect')
 def on_disconnect():
