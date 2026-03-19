@@ -4,7 +4,6 @@ from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'med_secret_123'
-# Use async_mode='eventlet' or 'gevent' for better performance on Render
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # This stores everyone currently in the clinic
@@ -25,7 +24,6 @@ def emit_user_update():
             'sid': sid
         })
     
-    # Sends the list to all connected clients (Doctor's UI filters this)
     socketio.emit('user_count', {
         'count': len(active_users),
         'users_list': users_list
@@ -35,28 +33,17 @@ def emit_user_update():
 
 @socketio.on('user_joined')
 def handle_user_joined(data):
-    # Register user in server memory
     active_users[request.sid] = {
         'name': data.get('name'),
         'role': data.get('role')
     }
-    
-    name = data.get('name')
-    
-    # PRIVATE WELCOME: Only the person joining sees this
     emit('render_msg', {
         'user': 'System',
-        'content': f'Welcome to Corny-Comm, {name}! Your connection is secure.',
+        'content': f'Welcome to Corny-Comm, {data.get("name")}! Your session is secure.',
         'time': ''
     })
-
-    # Update Doctor's sidebar
     emit_user_update()
-
-    # BROADCAST COUNT ONLY: Maintain anonymity
-    socketio.emit('user_count', {
-        'count': len(active_users)
-    }, broadcast=True)
+    socketio.emit('user_count', {'count': len(active_users)}, broadcast=True)
 
 @socketio.on('message')
 def handle_message(data):
@@ -102,6 +89,14 @@ def handle_voice(data):
             if info.get('role') == 'Doctor' or sid == sender_sid:
                 emit('render_msg', packet, room=sid)
 
+@socketio.on('emergency_alert')
+def handle_emergency(data):
+    # Sends a signal to EVERYONE; frontend logic shows it only to Doctors
+    emit('doctor_alert', {
+        'user': data['user'],
+        'time': data['time']
+    }, broadcast=True)
+
 @socketio.on('disconnect')
 def handle_disconnect():
     if request.sid in active_users:
@@ -109,6 +104,7 @@ def handle_disconnect():
         emit_user_update()
         socketio.emit('user_count', {'count': len(active_users)}, broadcast=True)
 
+# 🚦 THE IGNITION SWITCH - ALWAYS AT THE VERY END 🚦
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port)

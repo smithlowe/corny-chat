@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corny-Comm Medical 🏥</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        /* Modern Medical Theme */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        
+        /* LOGIN CARD STYLES (From your new code) */
+        #login-container { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; width: 320px; }
+        .logo-icon { font-size: 3.5rem; margin-bottom: 10px; }
+        
+        /* INPUTS & SELECTS */
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 25px; box-sizing: border-box; outline: none; font-size: 14px; }
+        input:focus, select:focus { border-color: #007bff; }
+        
+        /* BUTTONS */
+        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        button:hover { background: #0056b3; transform: translateY(-1px); }
+        
+        /* CHAT CONTAINER (Hidden by default) */
+        #chat-container { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 600px; margin: auto; background: white; border-left: 1px solid #ddd; border-right: 1px solid #ddd; position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+        
+        /* MESSAGES AREA */
+        #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; background: #f9f9f9; }
+        .message { margin-bottom: 15px; padding: 12px; border-radius: 12px; width: fit-content; max-width: 80%; line-height: 1.4; }
+        .other-msg { background: #ffffff; align-self: flex-start; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .my-msg { background: #007bff; color: white; align-self: flex-end; box-shadow: 0 2px 5px rgba(0,123,255,0.2); }
+        
+        /* INPUT AREA */
+        #input-area { padding: 20px; display: flex; gap: 10px; background: #fff; border-top: 1px solid #eee; align-items: center; }
+        #messageInput { flex: 1; margin: 0; }
+        .btn-action { width: auto; padding: 10px 15px; font-size: 12px; }
+        .btn-leave { background: #dc3545; }
+        .btn-clear { background: #6c757d; }
+        #typing-status { padding: 5px 20px; font-size: 0.8em; color: #777; font-style: italic; background: white; }
+    </style>
+</head>
+<body>
+
+    <div id="login-container">
+        <div class="logo-icon">🏥</div>
+        <h2 style="color: #333; margin: 0;">Corny-Comm</h2>
+        <p style="color: #666; margin-top: 5px; margin-bottom: 20px;">Medical Consultation Portal</p>
+        
+        <input type="text" id="username" placeholder="Your Full Name">
+        
+        <select id="hospital">
+            <option value="General Clinic">General Clinic (Default)</option>
+            <option value="Mulago Hospital">Mulago National Hospital</option>
+            <option value="Nakasero Hospital">Nakasero Hospital</option>
+            <option value="Mukono Health Centre">Mukono Health Centre IV</option>
+        </select>
+
+        <select id="roleSelect" onchange="toggleDoctorInput()">
+            <option value="Doctor">I am a Doctor 👨‍⚕️</option>
+            <option value="Patient">I am a Patient 🤒</option>
+        </select>
+
+        <div id="doctor-selection" style="display:none;">
+            <input type="text" id="targetDoctor" placeholder="Enter Doctor's Name">
+        </div>
+
+        <button onclick="joinClinic()">START CONSULTATION</button>
+    </div>
+
+    <div id="chat-container">
+        <div id="chat-header-bg" style="background: #007bff; color: white; padding: 15px; text-align: center;">
+            <h3 id="clinic-header" style="margin:0;">Consultation</h3>
+        </div>
+        <div id="messages"></div>
+        <div id="typing-status"></div>
+        <div id="input-area">
+            <input type="text" id="messageInput" placeholder="Type medical notes..." oninput="broadcastTyping()">
+            <button onclick="sendMessage()" style="width: auto;">Send</button>
+            <button onclick="downloadChat()" style="background: #28a745; width: auto;" title="Save Record">📄</button>
+            <button class="btn-leave btn-action" onclick="logout()">Leave</button>
+            <button class="btn-clear btn-action" onclick="clearHistory()">Clear</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let myName = "", myRole = "", myHospital = "", myDoctor = "", typeTimer;
+
+        function toggleDoctorInput() {
+            const role = document.getElementById('roleSelect').value;
+            document.getElementById('doctor-selection').style.display = (role === 'Patient') ? 'block' : 'none';
+        }
+
+        window.onload = () => {
+            const savedName = sessionStorage.getItem('chat_name');
+            const savedHospital = sessionStorage.getItem('chat_hospital');
+            if(savedName && savedHospital) {
+                myName = savedName; 
+                myRole = sessionStorage.getItem('chat_role');
+                myHospital = savedHospital;
+                myDoctor = sessionStorage.getItem('chat_doc');
+                showChatUI();
+                socket.emit('join', { name: myName, role: myRole, hospital: myHospital, doctorName: myDoctor });
+            }
+            loadHistory();
+        };
+
+        function joinClinic() {
+            myName = document.getElementById('username').value;
+            myRole = document.getElementById('roleSelect').value;
+            myHospital = document.getElementById('hospital').value;
+            myDoctor = (myRole === "Doctor") ? myName : document.getElementById('targetDoctor').value;
+
+            if (!myName.trim() || !myDoctor.trim()) return alert("Please provide your name and the doctor's name.");
+
+            sessionStorage.setItem('chat_name', myName);
+            sessionStorage.setItem('chat_role', myRole);
+            sessionStorage.setItem('chat_hospital', myHospital);
+            sessionStorage.setItem('chat_doc', myDoctor);
+
+            socket.emit('join', { name: myName, role: myRole, hospital: myHospital, doctorName: myDoctor });
+            showChatUI();
+        }
+
+        function showChatUI() {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('chat-container').style.display = 'flex';
+            document.getElementById('clinic-header').innerText = `${myHospital}: ${myName}`;
+            
+            const header = document.getElementById('chat-header-bg');
+            if (myHospital === "Mulago Hospital") header.style.background = "#d32f2f"; 
+            if (myHospital === "Nakasero Hospital") header.style.background = "#2e7d32"; 
+            if (myHospital === "Mukono Health Centre") header.style.background = "#ed6c02"; 
+        }
+
+        function sendMessage() {
+            const msgInput = document.getElementById('messageInput');
+            if (!msgInput.value.trim()) return;
+
+            socket.emit('send_message', {
+                message: msgInput.value,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            msgInput.value = "";
+            socket.emit('typing', { user: myName, isTyping: false }); 
+        }
+
+        socket.on('receive_message', (data) => {
+            renderMessage(data);
+            saveMessage(data); 
+        });
+
+        function renderMessage(data) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${data.user === myName ? 'my-msg' : 'other-msg'}`;
+            msgDiv.innerHTML = `<strong>${data.user}:</strong> ${data.message} <br><small style="font-size:0.7em; opacity: 0.7;">${data.timestamp}</small>`;
+            const msgBox = document.getElementById('messages');
+            msgBox.appendChild(msgDiv);
+            msgBox.scrollTop = msgBox.scrollHeight;
+        }
+
+        function downloadChat() {
+            const messageElements = document.querySelectorAll('.message');
+            if (messageElements.length === 0) return alert("No history to download.");
+            let chatContent = `MEDICAL RECORD: ${myHospital}\nDoctor: ${myDoctor}\nDate: ${new Date().toLocaleDateString()}\n--------------------------\n`;
+            messageElements.forEach(msg => chatContent += msg.innerText.replace(/\n/g, " ") + "\n");
+            const blob = new Blob([chatContent], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Consultation_Record.txt`;
+            link.click();
+        }
+
+        function saveMessage(data) {
+            let history = JSON.parse(localStorage.getItem('medical_chat')) || [];
+            if (!history.some(m => m.message === data.message && m.timestamp === data.timestamp)) {
+                history.push(data);
+                localStorage.setItem('medical_chat', JSON.stringify(history));
+            }
+        }
+
+        function loadHistory() {
+            let history = JSON.parse(localStorage.getItem('medical_chat')) || [];
+            history.forEach(msg => renderMessage(msg));
+        }
+
+        function clearHistory() {
+            if(confirm("Delete medical records?")) {
+                localStorage.removeItem('medical_chat');
+                document.getElementById('messages').innerHTML = "";
+            }
+        }
+
+        function broadcastTyping() {
+            socket.emit('typing', { user: myName, isTyping: true });
+            clearTimeout(typeTimer);
+            typeTimer = setTimeout(() => socket.emit('typing', { user: myName, isTyping: false }), 2000);
+        }
+
+        socket.on('display_typing', (data) => {
+            document.getElementById('typing-status').innerText = data.isTyping ? `${data.user} is typing...` : "";
+        });
+
+        document.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+        function logout() {
+            sessionStorage.clear();
+            location.reload();
+        }
+    </script>
+</body>
+</html>
