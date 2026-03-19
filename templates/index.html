@@ -50,20 +50,28 @@
             <button onclick="send()" style="width:auto;">Send</button>
         </div>
     </div>
-
+    
     <script>
+        let currentRoom = null;
+
         const socket = io();
         let myN, myH, myD, myR;
+window.onload = () => {
+    myN = localStorage.getItem('n'); myH = localStorage.getItem('h');
+    myR = localStorage.getItem('r'); myD = localStorage.getItem('d');
+    currentRoom = localStorage.getItem('currR'); // 👈 Add this line
 
-        window.onload = () => {
-            myN = localStorage.getItem('n'); myH = localStorage.getItem('h');
-            myR = localStorage.getItem('r'); myD = localStorage.getItem('d');
-            if(myN && myH) {
-                uiLobby();
-                socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
-                if(myD && myD !== "null") showChat(myD);
-            }
-        };
+    if(myN && myH) {
+        uiLobby();
+        socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
+        
+        if(myD && myD !== "null") {
+            // Re-join the private room if it exists in memory
+            if(currentRoom) socket.emit('join_private', { room_id: currentRoom });
+            showChat(myD);
+        }
+    }
+};
 
         async function join() {
             myN = document.getElementById('username').value;
@@ -105,10 +113,14 @@
             });
         });
 
-        socket.on('start_session', (data) => {
-            if(myR === 'Doctor' && myN === data.doctor) showChat(data.patient);
-            else if(myR === 'Patient' && myN === data.patient) { myD = data.doctor; localStorage.setItem('d', data.doctor); showChat(data.doctor); }
-        });
+    socket.on('start_private_session', (data) => {
+    if ((myR === 'Doctor' && myN === data.doctor) || (myR === 'Patient' && myN === data.patient)) {
+        currentRoom = data.room_id;
+        localStorage.setItem('currR', currentRoom); // 👈 Save room to memory
+        socket.emit('join_private', { room_id: currentRoom });
+        showChat(myR === 'Doctor' ? data.patient : data.doctor);
+    }
+});
 
         function showChat(t) {
             document.getElementById('login-container').style.display = 'none';
@@ -117,11 +129,18 @@
         }
 
         function send() {
-            const i = document.getElementById('m-input');
-            if(!i.value) return;
-            socket.emit('send_message', {user: myN, message: i.value, hospital: myH, doctorName: myD});
-            i.value = "";
-        }
+    const i = document.getElementById('m-input');
+    if(!i.value.trim()) return;
+
+    socket.emit('send_message', {
+        user: myN, 
+        message: i.value, 
+        hospital: myH, 
+        doctorName: myD,
+        room_id: currentRoom // <--- This tells the server "Only send this to our private bubble"
+    });
+    i.value = "";
+}
 
         socket.on('receive_message', (data) => {
             if(data.doctorName === myD) {
@@ -132,6 +151,9 @@
                 document.getElementById('messages').scrollTop = 9999;
             }
         });
+        document.getElementById('m-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') send();
+});
 
         socket.on('load_history', (msgs) => {
             document.getElementById('messages').innerHTML = "";
@@ -144,17 +166,26 @@
         });
 
         function end() {
-            socket.emit('end_session_global', {hospital: myH, doctor: myD});
-        }
-
-        socket.on('force_exit_session', (data) => {
-            if(myD === data.doctor) {
-                localStorage.removeItem('d'); myD = null;
-                document.getElementById('chat-container').style.display = 'none';
-                document.getElementById('login-container').style.display = 'block';
-                document.getElementById('messages').innerHTML = "";
-            }
+    if(confirm("End this consultation?")) {
+        socket.emit('end_session_global', {
+            hospital: myH, 
+            doctor: myD, 
+            room_id: currentRoom // Tell the server which room to clear
         });
+    }
+}
+
+      socket.on('force_exit_session', (data) => {
+    if(myD === data.doctor) {
+        localStorage.removeItem('d'); 
+        localStorage.removeItem('currR'); // 👈 ADD THIS: Clean up the room key
+        myD = null;
+        currentRoom = null; // 👈 ADD THIS: Reset local variable
+        document.getElementById('chat-container').style.display = 'none';
+        document.getElementById('login-container').style.display = 'block';
+        document.getElementById('messages').innerHTML = "";
+    }
+});
     </script>
 </body>
 </html>

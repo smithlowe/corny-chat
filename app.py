@@ -1,19 +1,18 @@
-import os
 from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit, join_room
-from supabase import create_client, Client
+from flask_socketio import SocketIO, emit, join_room, leave_room
+import uuid
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'medical-secret-2026'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+app.config['SECRET_KEY'] = 'medical-secret-123'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# --- DATABASE ---
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
-
-HOSPITAL_CODES = {"Mulago": "MUL789", "Nakasero": "NAK456", "Mukono": "MUK123", "Developer": "LAW2026"}
-ACTIVE_DOCTORS = {h: {} for h in HOSPITAL_CODES.keys()}
+# In-memory storage (Use a DB like SQLite/Postgres for production)
+hospitals = {
+    "Mulago": {"doctors": set(), "codes": ["MUL123"]},
+    "Nakasero": {"doctors": set(), "codes": ["NAK456"]},
+    "Mukono": {"doctors": set(), "codes": ["MUK789"]}
+}
+chat_histories = {} # room_id: [messages]
 
 @app.route('/')
 def index():
@@ -22,63 +21,81 @@ def index():
 @app.route('/verify-code', methods=['POST'])
 def verify_code():
     data = request.json
-    h, c = data.get('hospital'), data.get('code')
-    return jsonify({"success": HOSPITAL_CODES.get(h) == c})
+    hosp = data.get('hospital')
+    code = data.get('code')
+    if hosp in hospitals and code in hospitals[hosp]['codes']:
+        return jsonify({"success": True})
+    return jsonify({"success": False})
+
+# --- Socket Events ---
 
 @socketio.on('join')
-def on_join(data):
-    name, hospital, role = data.get('name'), data.get('hospital'), data.get('role')
-    if not name or not hospital: return
+def handle_join(data):
+    name = data['name']
+    hosp = data['hospital']
+    role = data['role']
     
-    join_room(hospital)
+    # Logic for Doctors
     if role == 'Doctor':
-        if ACTIVE_DOCTORS[hospital].get(name) != "busy":
-            ACTIVE_DOCTORS[hospital][name] = "available"
+        hospitals[hosp]['doctors'].add(name)
     
-    # Fetch history if doctor context exists
-    doc_name = data.get('doctor_name')
-    if doc_name and doc_name != "null":
-        try:
-            res = supabase.table("messages").select("*").eq("hospital", hospital).eq("doctor_name", doc_name).order("created_at").limit(30).execute()
-            emit('load_history', res.data)
-        except Exception as e: print(f"DB Error: {e}")
-            
-    send_updates(hospital)
-
-def send_updates(h):
-    avail = [n for n, s in ACTIVE_DOCTORS[h].items() if s == "available"]
-    emit('update_doctor_list', avail, room=h)
+    # Join the hospital-wide lobby room
+    join_room(hosp)
+    
+    # Update only the patients in that specific hospital lobby
+    emit('update_doctor_list', list(hospitals[hosp]['doctors']), to=hosp)
 
 @socketio.on('accept_patient')
-def handle_acc(data):
-    h, d, p = data['hospital'], data['doctor'], data['patient']
-    ACTIVE_DOCTORS[h][d] = "busy"
-    send_updates(h)
-    emit('start_session', {'doctor': d, 'patient': p}, room=h)
+def handle_accept(data):
+    # Create a unique private room ID
+    room_id = str(uuid.uuid4())[:8]
+    data['room_id'] = room_id
+    
+    # Notify both patient and doctor in the hospital lobby to move to private
+    emit('start_private_session', data, to=data['hospital'])
+
+@socketio.on('join_private')
+def handle_private_join(data):
+    room = data['room_id']
+    join_room(room)
+    # If history exists, send it to the user joining
+    if room in chat_histories:
+        emit('load_history', chat_histories[room])
 
 @socketio.on('send_message')
-def handle_msg(data):
-    # CRITICAL: Broadcast to the hospital room so both sides hear it
-    emit('receive_message', data, room=data['hospital'])
-    try:
-        supabase.table("messages").insert({
-            "sender": data['user'], "hospital": data['hospital'],
-            "doctor_name": data.get('doctorName'), "content": data['message']
-        }).execute()
-    except Exception as e: print(f"Save Error: {e}")
+def handle_message(data):
+    room = data.get('room_id')
+    msg_obj = {
+        "user": data['user'],
+        "message": data['message'],
+        "doctorName": data['doctorName']
+    }
+    
+    # Store history
+    if room not in chat_histories:
+        chat_histories[room] = []
+    chat_histories[room].append({"sender": data['user'], "content": data['message']})
+    
+    # Send only to the private room
+    emit('receive_message', msg_obj, to=room)
 
 @socketio.on('end_session_global')
 def handle_end(data):
-    h, d = data['hospital'], data['doctor']
-    if h in ACTIVE_DOCTORS: ACTIVE_DOCTORS[h][d] = "available"
-    emit('force_exit_session', {'doctor': d}, room=h)
-    send_updates(h)
+    room = data.get('room_id')
+    # Signal both parties to exit the chat UI
+    emit('force_exit_session', data, to=room)
+    # Clear history and leave room
+    if room in chat_histories:
+        del chat_histories[room]
+    leave_room(room)
 
 @socketio.on('doctor_logout')
 def handle_logout(data):
-    h, n = data['hospital'], data['name']
-    if h in ACTIVE_DOCTORS: ACTIVE_DOCTORS[h].pop(n, None)
-    send_updates(h)
+    hosp = data['hospital']
+    name = data['name']
+    if name in hospitals[hosp]['doctors']:
+        hospitals[hosp]['doctors'].remove(name)
+    emit('update_doctor_list', list(hospitals[hosp]['doctors']), to=hosp)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
