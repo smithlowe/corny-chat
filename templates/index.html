@@ -34,6 +34,7 @@
         <select id="hospital">
             <option value="Mulago">Mulago Hospital</option>
             <option value="Nakasero">Nakasero Hospital</option>
+            <option value="Mukono">Mukono Hospital</option>
         </select>
         <button id="main-btn" onclick="joinClinic()">JOIN HOSPITAL LOBBY</button>
         
@@ -47,7 +48,7 @@
         <div style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
             <span id="header-title">Consultation</span>
             <button onclick="endConsultation()" style="width: auto; background: #dc3545; padding: 5px 15px; border-radius: 20px; font-size: 0.8em;">
-                EXIT SESSION
+                END SESSION
             </button>
         </div>
         <div id="messages"></div>
@@ -61,26 +62,29 @@
         const socket = io();
         let myName, myHospital, myDoctor, myRole;
 
-        // 🔄 Check for existing session on page load
         window.onload = () => {
             const savedName = localStorage.getItem('corny_name');
             const savedHospital = localStorage.getItem('corny_hospital');
             const savedRole = localStorage.getItem('corny_role');
+            const savedDoctor = localStorage.getItem('corny_doctor');
 
             if (savedName && savedHospital) {
                 myName = savedName;
                 myHospital = savedHospital;
                 myRole = savedRole;
-                myDoctor = localStorage.getItem('corny_doctor');
+                myDoctor = savedDoctor;
 
-                // Re-join the server automatically
-                socket.emit('join', {name: myName, hospital: myHospital, role: myRole});
+                socket.emit('join', {
+                    name: myName, 
+                    hospital: myHospital, 
+                    role: myRole, 
+                    doctor_name: myDoctor
+                });
                 
-                // If we were already in a chat, show it
-                if (myDoctor && myDoctor !== "null" && myDoctor !== "undefined") {
+                if (myDoctor && myDoctor !== "null") {
                     document.getElementById('login-container').style.display = 'none';
                     document.getElementById('chat-container').style.display = 'flex';
-                    document.getElementById('header-title').innerText = "Resumed: " + myDoctor;
+                    document.getElementById('header-title').innerText = "Session: " + myDoctor;
                 }
             }
         };
@@ -109,40 +113,30 @@
                 myDoctor = myName; 
             }
 
-            socket.emit('join', {name: myName, hospital: myHospital, role: myRole});
-            
-            // Save data for refresh persistence
             localStorage.setItem('corny_name', myName);
             localStorage.setItem('corny_hospital', myHospital);
             localStorage.setItem('corny_role', myRole);
             localStorage.setItem('corny_doctor', myDoctor);
 
+            socket.emit('join', {name: myName, hospital: myHospital, role: myRole, doctor_name: myDoctor});
+            
             document.getElementById('main-btn').innerText = "Logged into Lobby";
             document.getElementById('main-btn').disabled = true;
-            
-            if(myRole === 'Patient') {
-                document.getElementById('doctor-list-section').style.display = 'block';
-            }
+            if(myRole === 'Patient') document.getElementById('doctor-list-section').style.display = 'block';
         }
 
         socket.on('update_doctor_list', (doctors) => {
             const container = document.getElementById('doctor-buttons');
             container.innerHTML = "";
-            if (doctors.length === 0) {
-                container.innerHTML = "<small style='color:gray;'>Waiting for doctors...</small>";
-                return;
-            }
             doctors.forEach(doc => {
                 const btn = document.createElement('button');
                 btn.className = "doc-btn";
                 btn.innerText = "Consult " + doc;
                 btn.onclick = () => {
                     myDoctor = doc;
-                    localStorage.setItem('corny_doctor', doc); // Update persistence
-                    const allBtns = document.querySelectorAll('.doc-btn');
-                    allBtns.forEach(b => b.disabled = true);
-                    btn.innerText = "Request Sent...";
+                    localStorage.setItem('corny_doctor', doc);
                     socket.emit('request_consultation', {patient: myName, doctor: doc, hospital: myHospital});
+                    btn.innerText = "Waiting for Doctor...";
                 };
                 container.appendChild(btn);
             });
@@ -150,7 +144,7 @@
 
         socket.on('consultation_request', (data) => {
             if (myRole === 'Doctor' && myName === data.doctor) {
-                if (confirm(`Patient ${data.patient} is requesting a consultation. Accept?`)) {
+                if (confirm(`Accept patient ${data.patient}?`)) {
                     socket.emit('accept_patient', {doctor: myName, hospital: myHospital, patient: data.patient});
                 }
             }
@@ -159,11 +153,16 @@
         socket.on('start_session', (data) => {
             if ((myRole === 'Doctor' && myName === data.doctor) || 
                 (myRole === 'Patient' && myDoctor === data.doctor && myName === data.patient)) {
-                
                 document.getElementById('login-container').style.display = 'none';
                 document.getElementById('chat-container').style.display = 'flex';
-                document.getElementById('header-title').innerText = "Chat with " + (myRole === 'Doctor' ? data.patient : data.doctor);
+                document.getElementById('header-title').innerText = "Chatting with " + (myRole === 'Doctor' ? data.patient : data.doctor);
             }
+        });
+
+        socket.on('load_history', (messages) => {
+            const container = document.getElementById('messages');
+            container.innerHTML = "";
+            messages.forEach(m => addMessageToUI(m.sender, m.content));
         });
 
         function sendMessage() {
@@ -173,26 +172,35 @@
                 user: myName, 
                 message: inp.value, 
                 hospital: myHospital, 
-                doctorName: myDoctor, 
-                timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                doctorName: myDoctor
             });
             inp.value = "";
         }
 
+        socket.on('receive_message', (data) => {
+            if (data.doctorName === myDoctor) {
+                addMessageToUI(data.user, data.message);
+            }
+        });
+
+        function addMessageToUI(sender, text) {
+            const div = document.createElement('div');
+            div.className = `message ${sender === myName ? 'my-msg' : 'other-msg'}`;
+            div.innerHTML = `<b>${sender}:</b> ${text}`;
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+
         function endConsultation() {
-            if(confirm("End session and return to lobby?")) {
-                localStorage.clear();
-                location.reload();
+            if(confirm("End session for both?")) {
+                socket.emit('end_session_global', {hospital: myHospital, doctor: myDoctor});
             }
         }
 
-        socket.on('receive_message', (data) => {
-            if (data.doctorName === myDoctor) {
-                const div = document.createElement('div');
-                div.className = `message ${data.user === myName ? 'my-msg' : 'other-msg'}`;
-                div.innerHTML = `<b>${data.user}:</b> ${data.message} <br><small style='opacity:0.6; font-size:0.7em;'>${data.timestamp || ''}</small>`;
-                document.getElementById('messages').appendChild(div);
-                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        socket.on('force_exit_session', (data) => {
+            if (myDoctor === data.doctor) {
+                localStorage.removeItem('corny_doctor');
+                location.reload();
             }
         });
     </script>

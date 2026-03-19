@@ -1,19 +1,16 @@
 import os
-from flask import Flask, render_template, request, jsonify  # Added request and jsonify
-from flask_socketio import SocketIO, emit, join_room      # Added join_room
-from supabase import create_client, Client 
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit, join_room
+from supabase import create_client, Client
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'medical-secret-2026'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # --- DATABASE CONNECTION ---
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
-
-app.config['SECRET_KEY'] = 'medical-secret-2026'
-socketio = SocketIO(app, cors_allowed_origins="*")
-
-# ... rest of your code ...
 
 # 🔑 HOSPITAL PASSCODE REGISTRY
 HOSPITAL_CODES = {
@@ -24,7 +21,6 @@ HOSPITAL_CODES = {
 }
 
 # 📋 QUEUE & DOCTOR TRACKING
-# Stores status: {"Mulago": {"Dr. Law": "available", "Dr. Sarah": "busy"}}
 ACTIVE_DOCTORS = {h: {} for h in HOSPITAL_CODES.keys()}
 
 @app.route('/')
@@ -36,8 +32,6 @@ def verify_code():
     data = request.json
     hospital = data.get('hospital')
     input_code = data.get('code')
-    
-    # Check if the code matches the hospital registry
     if HOSPITAL_CODES.get(hospital) == input_code:
         return jsonify({"success": True})
     return jsonify({"success": False}), 401
@@ -46,30 +40,40 @@ def verify_code():
 
 @socketio.on('join')
 def on_join(data):
-    role = data.get('role')
-    hospital = data.get('hospital')
     name = data.get('name')
+    hospital = data.get('hospital')
+    role = data.get('role')
+    doctor_name = data.get('doctor_name') # Sent from JS to fetch history
     
-    # Everyone joins the general Hospital Lobby room
     join_room(hospital)
     
-    if role == 'Doctor' or role == 'Developer':
-        # Mark doctor as available in the global tracker
-        ACTIVE_DOCTORS[hospital][name] = "available"
-        print(f"👨‍⚕️ Doctor {name} joined the {hospital} lobby.")
+    if role in ['Doctor', 'Developer']:
+        # Only set to available if they aren't already busy in a session
+        if ACTIVE_DOCTORS[hospital].get(name) != "busy":
+            ACTIVE_DOCTORS[hospital][name] = "available"
     
-    # Update the list for all patients in that hospital
+    # 📥 PULL HISTORY from Supabase
+    if doctor_name and doctor_name != "undefined":
+        try:
+            history = supabase.table("messages") \
+                .select("*") \
+                .eq("hospital", hospital) \
+                .eq("doctor_name", doctor_name) \
+                .order("created_at", desc=False) \
+                .limit(30) \
+                .execute()
+            emit('load_history', history.data)
+        except Exception as e:
+            print(f"History Load Error: {e}")
+    
     send_doctor_updates(hospital)
 
 def send_doctor_updates(hospital):
-    # Only send doctors who are "available" (not busy)
     available_docs = [name for name, status in ACTIVE_DOCTORS[hospital].items() if status == "available"]
     emit('update_doctor_list', available_docs, room=hospital)
 
 @socketio.on('request_consultation')
 def handle_request(data):
-    # Sends a private alert to the specific hospital lobby
-    # We include the patient name and the specific doctor's name
     emit('consultation_request', {
         'patient': data['patient'],
         'doctor': data['doctor']
@@ -81,35 +85,39 @@ def handle_accept(data):
     doctor = data['doctor']
     patient = data['patient']
     
-    # 🔒 Lock the doctor so they disappear from the "Available" list
     ACTIVE_DOCTORS[hospital][doctor] = "busy"
     send_doctor_updates(hospital)
     
-    # Tell both parties to open their chat windows
     emit('start_session', {
         'doctor': doctor, 
         'patient': patient
     }, room=hospital)
+
 @socketio.on('send_message')
 def handle_message(data):
-    # 1. Save to Supabase (The "Permanent" part)
     try:
         supabase.table("messages").insert({
             "sender": data['user'],
             "hospital": data['hospital'],
-            "doctor_name": data.get('doctorName', 'General'), # Safety check
+            "doctor_name": data.get('doctorName', 'General'),
             "content": data['message']
         }).execute()
     except Exception as e:
-        print(f"Database Error: {e}")
+        print(f"Database Save Error: {e}")
 
-    # 2. Send live to everyone (The "Chat" part)
     emit('receive_message', data, broadcast=True)
 
-@socketio.on('disconnect')
-def on_disconnect():
-    # Optional: Clean up ACTIVE_DOCTORS if a doctor closes their tab
-    pass
+@socketio.on('end_session_global')
+def handle_end_session(data):
+    hospital = data.get('hospital')
+    doctor = data.get('doctor')
+    
+    if hospital in ACTIVE_DOCTORS and doctor in ACTIVE_DOCTORS[hospital]:
+        ACTIVE_DOCTORS[hospital][doctor] = "available"
+    
+    # Tell both parties to clear their screens
+    emit('force_exit_session', {'doctor': doctor}, room=hospital)
+    send_doctor_updates(hospital)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
