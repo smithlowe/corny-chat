@@ -2,61 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Corny-Comm Medical 🏥</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Corny-Comm Medical</title>
+    <link rel="icon" href="data:,">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #login-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; width: 340px; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 25px; outline: none; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; margin-top: 5px; }
-        #logout-btn { background: #6c757d; display: none; }
-        #doctor-list-section { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
-        .doc-btn { background: #28a745; margin-bottom: 5px; font-size: 0.9em; }
-        #chat-container { display: none; flex-direction: column; height: 100dvh; width: 100%; max-width: 600px; background: white; position: fixed; top: 0; z-index: 10; }
-        #messages { flex: 1; overflow-y: auto; padding: 20px; background: #f9f9f9; display: flex; flex-direction: column; }
-        .message { margin-bottom: 15px; padding: 10px 15px; border-radius: 15px; max-width: 80%; line-height: 1.4; }
-        .my-msg { background: #007bff; color: white; align-self: flex-end; }
-        .other-msg { background: #e9ecef; align-self: flex-start; color: #333; }
-        #input-area { padding: 20px; border-top: 1px solid #eee; display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 30px); }
+        body { font-family: 'Segoe UI', system-ui; background: #f0f2f5; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        #login-container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 320px; text-align: center; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 25px; border: 1px solid #ddd; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .doc-btn { background: #28a745; font-size: 0.9em; }
+        #chat-container { display: none; flex-direction: column; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 100; }
+        #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; background: #f8f9fa; }
+        .message { padding: 10px 15px; border-radius: 18px; max-width: 75%; font-size: 0.95em; }
+        .my-msg { align-self: flex-end; background: #007bff; color: white; }
+        .other-msg { align-self: flex-start; background: #e9ecef; color: #333; }
+        #input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; padding-bottom: calc(15px + env(safe-area-inset-bottom)); }
     </style>
 </head>
 <body>
 
     <div id="login-container">
-        <div style="font-size: 3rem;">🏥</div>
-        <h2 style="margin: 10px 0;">Corny-Comm</h2>
-        <input type="text" id="username" placeholder="Your Name">
-        <select id="role" onchange="togglePasscode()">
+        <h1 style="margin:0;">🏥</h1>
+        <h2>Corny-Comm</h2>
+        <input type="text" id="username" placeholder="Full Name">
+        <select id="role" onchange="document.getElementById('accessCode').style.display=(this.value=='Doctor'?'block':'none')">
             <option value="Patient">Patient</option>
             <option value="Doctor">Doctor</option>
         </select>
-        <input type="password" id="accessCode" placeholder="Passcode" style="display:none;">
+        <input type="password" id="accessCode" placeholder="Doctor Passcode" style="display:none;">
         <select id="hospital">
             <option value="Mulago">Mulago Hospital</option>
             <option value="Nakasero">Nakasero Hospital</option>
             <option value="Mukono">Mukono Hospital</option>
         </select>
-        <button id="main-btn" onclick="joinClinic()">JOIN HOSPITAL LOBBY</button>
-        <button id="logout-btn" onclick="doctorLogout()">LOG OUT (GO OFFLINE)</button>
-        
-        <div id="doctor-list-section" style="display:none;">
-            <p><small style="color: #666;">Available Doctors:</small></p>
+        <button id="main-btn" onclick="joinClinic()">ENTER LOBBY</button>
+        <button id="logout-btn" onclick="doctorLogout()" style="display:none; background:#6c757d;">GO OFFLINE (LOGOUT)</button>
+        <div id="doctor-list-section" style="display:none; margin-top:20px; border-top:1px solid #eee; padding-top:10px;">
+            <p><small>Available Doctors:</small></p>
             <div id="doctor-buttons"></div>
         </div>
     </div>
 
     <div id="chat-container">
-        <div style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <span id="header-title" style="font-weight: bold;">Consultation</span>
-            <button onclick="endConsultation()" style="width: auto; background: #dc3545; padding: 5px 15px; border-radius: 20px; font-size: 0.8em; margin: 0;">
-                END SESSION
-            </button>
+        <div style="background:#007bff; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+            <span id="header-title">Consultation</span>
+            <button onclick="endConsultation()" style="width:auto; background:#dc3545; margin:0; padding:5px 15px;">END</button>
         </div>
         <div id="messages"></div>
         <div id="input-area">
-            <input type="text" id="messageInput" placeholder="Type a message...">
-            <button onclick="sendMessage()" style="width: auto; padding: 0 20px;">Send</button>
+            <input type="text" id="messageInput" placeholder="Type message...">
+            <button onclick="sendMessage()" style="width:auto;">Send</button>
         </div>
     </div>
 
@@ -65,41 +61,20 @@
         let myName, myHospital, myDoctor, myRole;
 
         window.onload = () => {
-            const savedName = localStorage.getItem('corny_name');
-            const savedHospital = localStorage.getItem('corny_hospital');
-            const savedRole = localStorage.getItem('corny_role');
-            const savedDoctor = localStorage.getItem('corny_doctor');
+            myName = localStorage.getItem('corny_name');
+            myHospital = localStorage.getItem('corny_hospital');
+            myRole = localStorage.getItem('corny_role');
+            myDoctor = localStorage.getItem('corny_doctor');
 
-            if (savedName && savedHospital) {
-                myName = savedName;
-                myHospital = savedHospital;
-                myRole = savedRole;
-                myDoctor = savedDoctor;
-
-                // UI setup for persistent login
+            if (myName && myHospital) {
                 document.getElementById('username').value = myName;
                 document.getElementById('hospital').value = myHospital;
                 document.getElementById('role').value = myRole;
-                document.getElementById('main-btn').innerText = "Logged in as " + myRole;
-                document.getElementById('main-btn').disabled = true;
-                
-                if(myRole === 'Doctor') document.getElementById('logout-btn').style.display = 'block';
-                if(myRole === 'Patient') document.getElementById('doctor-list-section').style.display = 'block';
-
-                socket.emit('join', {
-                    name: myName, hospital: myHospital, role: myRole, doctor_name: myDoctor
-                });
-                
-                if (myDoctor && myDoctor !== "null" && myDoctor !== "undefined") {
-                    showChatView(myDoctor);
-                }
+                setupLobbyUI();
+                socket.emit('join', {name: myName, hospital: myHospital, role: myRole, doctor_name: myDoctor});
+                if (myDoctor && myDoctor !== "null") showChat(myDoctor);
             }
         };
-
-        function togglePasscode() {
-            const role = document.getElementById('role').value;
-            document.getElementById('accessCode').style.display = (role === 'Doctor') ? 'block' : 'none';
-        }
 
         async function joinClinic() {
             myName = document.getElementById('username').value;
@@ -107,18 +82,14 @@
             myRole = document.getElementById('role').value;
             const code = document.getElementById('accessCode').value;
 
-            if (!myName) return alert("Enter your name");
-
+            if (!myName) return alert("Name required");
             if (myRole === 'Doctor') {
                 const res = await fetch('/verify-code', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({hospital: myHospital, code: code})
                 });
-                const data = await res.json();
-                if (!data.success) return alert("Invalid Code");
+                if (!(await res.json()).success) return alert("Invalid Code");
                 myDoctor = myName;
-                document.getElementById('logout-btn').style.display = 'block';
             }
 
             localStorage.setItem('corny_name', myName);
@@ -126,91 +97,95 @@
             localStorage.setItem('corny_role', myRole);
             localStorage.setItem('corny_doctor', myDoctor);
 
+            setupLobbyUI();
             socket.emit('join', {name: myName, hospital: myHospital, role: myRole, doctor_name: myDoctor});
-            
-            document.getElementById('main-btn').innerText = "In Lobby as " + myRole;
+        }
+
+        function setupLobbyUI() {
+            document.getElementById('main-btn').innerText = "Logged in as " + myRole;
             document.getElementById('main-btn').disabled = true;
-            if(myRole === 'Patient') document.getElementById('doctor-list-section').style.display = 'block';
+            if (myRole === 'Doctor') document.getElementById('logout-btn').style.display = 'block';
+            if (myRole === 'Patient') document.getElementById('doctor-list-section').style.display = 'block';
         }
 
         function doctorLogout() {
-            if(confirm("Log out? You will be marked as offline.")) {
+            if(confirm("Going offline?")) {
                 socket.emit('doctor_logout', {hospital: myHospital, name: myName});
                 localStorage.clear();
                 location.reload();
             }
         }
 
-        socket.on('update_doctor_list', (doctors) => {
+        socket.on('update_doctor_list', (docs) => {
             const container = document.getElementById('doctor-buttons');
-            container.innerHTML = doctors.length ? "" : "<small style='color:gray;'>No doctors available...</small>";
-            doctors.forEach(doc => {
-                const btn = document.createElement('button');
-                btn.className = "doc-btn";
-                btn.innerText = "Consult " + doc;
-                btn.onclick = () => {
+            container.innerHTML = docs.length ? "" : "<small>Waiting for doctors...</small>";
+            docs.forEach(doc => {
+                const b = document.createElement('button');
+                b.className = "doc-btn"; b.innerText = "Consult " + doc;
+                b.onclick = () => {
                     myDoctor = doc;
                     localStorage.setItem('corny_doctor', doc);
                     socket.emit('request_consultation', {patient: myName, doctor: doc, hospital: myHospital});
-                    btn.innerText = "Requesting...";
-                    btn.disabled = true;
+                    b.innerText = "Requesting..."; b.disabled = true;
                 };
-                container.appendChild(btn);
+                container.appendChild(b);
             });
         });
 
         socket.on('consultation_request', (data) => {
             if (myRole === 'Doctor' && myName === data.doctor) {
-                if (confirm(`Accept patient ${data.patient}?`)) {
+                if (confirm("Accept patient " + data.patient + "?")) {
                     socket.emit('accept_patient', {doctor: myName, hospital: myHospital, patient: data.patient});
                 }
             }
         });
 
         socket.on('start_session', (data) => {
-            if ((myRole === 'Doctor' && myName === data.doctor) || 
-                (myRole === 'Patient' && myDoctor === data.doctor && myName === data.patient)) {
-                showChatView(myRole === 'Doctor' ? data.patient : data.doctor);
+            if (myRole === 'Doctor' && myName === data.doctor) showChat(data.patient);
+            else if (myRole === 'Patient' && myName === data.patient) {
+                myDoctor = data.doctor;
+                localStorage.setItem('corny_doctor', data.doctor);
+                showChat(data.doctor);
             }
         });
 
-        function showChatView(titleName) {
+        function showChat(title) {
             document.getElementById('login-container').style.display = 'none';
             document.getElementById('chat-container').style.display = 'flex';
-            document.getElementById('header-title').innerText = "Session: " + titleName;
+            document.getElementById('header-title').innerText = "With: " + title;
         }
 
-        socket.on('load_history', (messages) => {
-            const container = document.getElementById('messages');
-            container.innerHTML = "";
-            messages.forEach(m => addMessageToUI(m.sender, m.content));
-        });
-
         function sendMessage() {
-            const inp = document.getElementById('messageInput');
-            if (!inp.value.trim()) return;
+            const i = document.getElementById('messageInput');
+            if (!i.value.trim()) return;
             socket.emit('send_message', {
-                user: myName, message: inp.value, hospital: myHospital, doctorName: myDoctor
+                user: myName, message: i.value, hospital: myHospital, doctorName: myDoctor
             });
-            inp.value = "";
+            i.value = "";
         }
 
         socket.on('receive_message', (data) => {
             if (data.doctorName === myDoctor) {
-                addMessageToUI(data.user, data.message);
+                const d = document.createElement('div');
+                d.className = `message ${data.user === myName ? 'my-msg' : 'other-msg'}`;
+                d.innerHTML = `<b>${data.user}:</b> ${data.message}`;
+                document.getElementById('messages').appendChild(d);
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
             }
         });
 
-        function addMessageToUI(sender, text) {
-            const div = document.createElement('div');
-            div.className = `message ${sender === myName ? 'my-msg' : 'other-msg'}`;
-            div.innerHTML = `<b>${sender}:</b> ${text}`;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-        }
+        socket.on('load_history', (msgs) => {
+            document.getElementById('messages').innerHTML = "";
+            msgs.forEach(m => {
+                const d = document.createElement('div');
+                d.className = `message ${m.sender === myName ? 'my-msg' : 'other-msg'}`;
+                d.innerHTML = `<b>${m.sender}:</b> ${m.content}`;
+                document.getElementById('messages').appendChild(d);
+            });
+        });
 
         function endConsultation() {
-            if(confirm("End session? You will remain in the lobby.")) {
+            if(confirm("End this session?")) {
                 socket.emit('end_session_global', {hospital: myHospital, doctor: myDoctor});
             }
         }
@@ -218,7 +193,10 @@
         socket.on('force_exit_session', (data) => {
             if (myDoctor === data.doctor) {
                 localStorage.removeItem('corny_doctor');
-                location.reload(); // Returns to lobby while keeping credentials
+                myDoctor = null;
+                document.getElementById('chat-container').style.display = 'none';
+                document.getElementById('login-container').style.display = 'block';
+                document.getElementById('messages').innerHTML = "";
             }
         });
     </script>
