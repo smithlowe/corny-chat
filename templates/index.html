@@ -67,95 +67,24 @@
         </div>
     </div>
     
-   <script>
-    let currentRoom = null;
-    const socket = io();
-    let myN, myH, myD, myR;
+   <!-- This tag tells the browser: "Don't show this, RUN this!" -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const savedUser = localStorage.getItem('n'); 
+    
+    // Make sure these IDs ('chat-container' and 'login-container') 
+    // match the id="" names in your HTML <div> tags exactly.
+    const lobby = document.getElementById('chat-container'); 
+    const login = document.getElementById('login-container');
 
-    window.onload = () => {
-        // 1. Get the EXACT keys you saved in join()
-        myN = localStorage.getItem('n'); 
-        myH = localStorage.getItem('h');
-        myR = localStorage.getItem('r'); 
-        myD = localStorage.getItem('d');
-        currentRoom = localStorage.getItem('currR');
-
-        // 2. Check if a valid session exists. If NOT, stay on login screen.
-        if (!myN || !myH) {
-            document.getElementById('login-container').style.display = 'block';
-            document.getElementById('chat-container').style.display = 'none';
-        } else {
-            // If they ARE logged in, restore the UI
-            uiLobby();
-            socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
-            
-            // If they were in a private chat, restore that too
-            if (currentRoom && currentRoom !== "null") {
-                socket.emit('join_private', { room_id: currentRoom });
-                showChat(myD);
-            }
-        }
-    };
-
-    async function join() {
-        myN = document.getElementById('username').value;
-        myH = document.getElementById('hospital').value;
-        myR = document.getElementById('role').value;
-
-        if (!myN.trim()) return alert("Please enter a name");
-
-        if(myR === 'Doctor') {
-            const res = await fetch('/verify-code', {
-                method:'POST', 
-                headers:{'Content-Type':'application/json'}, 
-                body:JSON.stringify({
-                    hospital: myH, 
-                    code: document.getElementById('accessCode').value,
-                    name: myN // Send name to server for session storage
-                })
-            });
-            if(!(await res.json()).success) return alert("Wrong Code");
-            myD = myN;
-        }
-
-        // Save to localStorage so refresh works
-        localStorage.setItem('n', myN); 
-        localStorage.setItem('h', myH); 
-        localStorage.setItem('r', myR); 
-        localStorage.setItem('d', myD);
-        
-        uiLobby();
-        socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
+    if (!savedUser) {
+        if(lobby) lobby.style.display = 'none';
+        if(login) login.style.display = 'block';
+    } else {
+        if(login) login.style.display = 'none';
+        if(lobby) lobby.style.display = 'flex';
     }
-
-    // FIX: The keys here must match the keys in join()
-    function logout() {
-        if(confirm("Are you sure you want to logout?")) {
-            // Tell the server to kill the session
-            fetch('/logout', {method: 'POST'}).then(() => {
-                // Clear the exact keys used
-                localStorage.removeItem('n');
-                localStorage.removeItem('h');
-                localStorage.removeItem('r');
-                localStorage.removeItem('d');
-                localStorage.removeItem('currR');
-                
-                // Reload to reset the whole app state
-                window.location.reload();
-            });
-        }
-    }
-
-    function uiLobby() {
-        document.getElementById('join-btn').disabled = true;
-        document.getElementById('join-btn').innerText = "In Lobby";
-        // Show logout button always if logged in
-        document.getElementById('logout-btn').style.display = 'block';
-        if(myR === 'Patient') document.getElementById('doc-list').style.display = 'block';
-    }
-
-    // ... (keep your socket.on handlers for messages and room events the same) ...
-
+});
 </script>
 </body>
 </html>
