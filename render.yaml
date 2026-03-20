@@ -1,0 +1,29 @@
+version: "1"
+projects:
+- name: ALL PROJECTS
+  environments:
+  - name: Production
+    databases:
+    - name: corny-chat-db
+      databaseName: corny_chat_db
+      user: corny_chat_db_user
+      plan: free
+      region: frankfurt
+      ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
+      postgresMajorVersion: "18"
+
+    services:
+    - type: web
+      name: corny-chat-app  # The name of your app
+      env: python           # Change to 'node' if using JavaScript
+      plan: free
+      region: frankfurt
+      buildCommand: pip install -r requirements.txt
+      startCommand: gunicorn app:app
+      envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: corny-chat-db
+          property: connectionString
