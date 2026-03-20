@@ -1,11 +1,24 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
+from flask import session
+
+@socketio.on('join')
+def on_join(data):
+    username = data.get('username')
+    # If the username is missing from the request and the session
+    if not username and 'username' not in session:
+        return False # This rejects the connection/event
+    
+    room = data.get('room')
+    join_room(room)
+    emit('status', {'msg': f'{username} has entered the room.'}, room=room)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'medical-secret-123'
+# Ensure sessions work across restarts during development
+app.config['SESSION_TYPE'] = 'filesystem' 
 socketio = SocketIO(app, cors_allowed_origins="*")
-
 # In-memory storage (Use a DB like SQLite/Postgres for production)
 hospitals = {
     "Mulago": {"doctors": set(), "codes": ["MUL123"]},
@@ -23,9 +36,20 @@ def verify_code():
     data = request.json
     hosp = data.get('hospital')
     code = data.get('code')
+    name = data.get('name') # Get the name from the request
+    
     if hosp in hospitals and code in hospitals[hosp]['codes']:
+        # STORE IN SESSION
+        session['user_name'] = name
+        session['hospital'] = hosp
+        session['role'] = 'Doctor'
         return jsonify({"success": True})
     return jsonify({"success": False})
+    
+    @app.route('/logout', methods=['POST'])
+def logout_route():
+    session.clear() # Wipes the server-side session
+    return jsonify({"success": True}
 
 # --- Socket Events ---
 

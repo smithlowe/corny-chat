@@ -2,6 +2,14 @@
 <html>
 <head>
     <title>Corny-Comm Medical</title>
+    document.addEventListener('DOMContentLoaded', () => {
+    const savedUser = localStorage.getItem('userName');
+    if (!savedUser) {
+        // Hide the chat lobby and show the login form
+        document.getElementById('lobby-container').style.display = 'none';
+        document.getElementById('login-container').style.display = 'block';
+    }
+});
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
@@ -95,9 +103,13 @@ window.onload = () => {
         }
 
         function logout() {
-            socket.emit('doctor_logout', {hospital: myH, name: myN});
-            localStorage.clear(); location.reload();
-        }
+    // Clear the stored user data
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    
+    // Redirect or refresh to show the login screen
+    window.location.reload(); 
+}
 
         socket.on('update_doctor_list', (docs) => {
             const area = document.getElementById('list-area');
