@@ -3,11 +3,19 @@
 <head>
     <title>Corny-Comm Medical</title>
     document.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('userName');
+    // Match the 'n' key you used in your join() function
+    const savedUser = localStorage.getItem('n'); 
+    
+    const lobby = document.getElementById('chat-container'); // Or 'lobby-container'
+    const login = document.getElementById('login-container');
+
     if (!savedUser) {
-        // Hide the chat lobby and show the login form
-        document.getElementById('lobby-container').style.display = 'none';
-        document.getElementById('login-container').style.display = 'block';
+        if(lobby) lobby.style.display = 'none';
+        if(login) login.style.display = 'block';
+    } else {
+        // If they ARE logged in, ensure the login form is hidden
+        if(login) login.style.display = 'none';
+        if(lobby) lobby.style.display = 'flex';
     }
 });
     <meta name="viewport" content="width=device-width, initial-scale=1">
