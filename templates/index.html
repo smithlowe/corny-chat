@@ -59,145 +59,95 @@
         </div>
     </div>
     
-    <script>
-        let currentRoom = null;
+   <script>
+    let currentRoom = null;
+    const socket = io();
+    let myN, myH, myD, myR;
 
-        const socket = io();
-        let myN, myH, myD, myR;
-window.onload = () => {
-    myN = localStorage.getItem('n'); myH = localStorage.getItem('h');
-    myR = localStorage.getItem('r'); myD = localStorage.getItem('d');
-    currentRoom = localStorage.getItem('currR'); // 👈 Add this line
+    window.onload = () => {
+        // 1. Get the EXACT keys you saved in join()
+        myN = localStorage.getItem('n'); 
+        myH = localStorage.getItem('h');
+        myR = localStorage.getItem('r'); 
+        myD = localStorage.getItem('d');
+        currentRoom = localStorage.getItem('currR');
 
-    if(myN && myH) {
-        uiLobby();
-        socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
-        
-        if(myD && myD !== "null") {
-            // Re-join the private room if it exists in memory
-            if(currentRoom) socket.emit('join_private', { room_id: currentRoom });
-            showChat(myD);
-        }
-    }
-};
-
-        async function join() {
-            myN = document.getElementById('username').value;
-            myH = document.getElementById('hospital').value;
-            myR = document.getElementById('role').value;
-            if(myR === 'Doctor') {
-                const res = await fetch('/verify-code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({hospital:myH, code:document.getElementById('accessCode').value})});
-                if(!(await res.json()).success) return alert("Wrong Code");
-                myD = myN;
-            }
-            localStorage.setItem('n', myN); localStorage.setItem('h', myH); localStorage.setItem('r', myR); localStorage.setItem('d', myD);
+        // 2. Check if a valid session exists. If NOT, stay on login screen.
+        if (!myN || !myH) {
+            document.getElementById('login-container').style.display = 'block';
+            document.getElementById('chat-container').style.display = 'none';
+        } else {
+            // If they ARE logged in, restore the UI
             uiLobby();
             socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
-        }
-
-        function uiLobby() {
-            document.getElementById('join-btn').disabled = true;
-            document.getElementById('join-btn').innerText = "In Lobby";
-            if(myR === 'Doctor') document.getElementById('logout-btn').style.display = 'block';
-            if(myR === 'Patient') document.getElementById('doc-list').style.display = 'block';
-        }
-
-        function logout() {
-    // Clear the stored user data
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userRole');
-    
-    // Redirect or refresh to show the login screen
-    window.location.reload(); 
-}
-
-        socket.on('update_doctor_list', (docs) => {
-            const area = document.getElementById('list-area');
-            area.innerHTML = docs.length ? "" : "No doctors...";
-            docs.forEach(d => {
-                const b = document.createElement('button');
-                b.innerText = "Consult " + d;
-                b.onclick = () => {
-                    myD = d; localStorage.setItem('d', d);
-                    socket.emit('accept_patient', {doctor: d, hospital: myH, patient: myN}); // Direct trigger for speed
-                };
-                area.appendChild(b);
-            });
-        });
-
-    socket.on('start_private_session', (data) => {
-    if ((myR === 'Doctor' && myN === data.doctor) || (myR === 'Patient' && myN === data.patient)) {
-        currentRoom = data.room_id;
-        localStorage.setItem('currR', currentRoom); // 👈 Save room to memory
-        socket.emit('join_private', { room_id: currentRoom });
-        showChat(myR === 'Doctor' ? data.patient : data.doctor);
-    }
-});
-
-        function showChat(t) {
-            document.getElementById('login-container').style.display = 'none';
-            document.getElementById('chat-container').style.display = 'flex';
-            document.getElementById('chat-with').innerText = "With: " + t;
-        }
-
-        function send() {
-    const i = document.getElementById('m-input');
-    if(!i.value.trim()) return;
-
-    socket.emit('send_message', {
-        user: myN, 
-        message: i.value, 
-        hospital: myH, 
-        doctorName: myD,
-        room_id: currentRoom // <--- This tells the server "Only send this to our private bubble"
-    });
-    i.value = "";
-}
-
-        socket.on('receive_message', (data) => {
-            if(data.doctorName === myD) {
-                const div = document.createElement('div');
-                div.className = `msg ${data.user === myN ? 'my' : 'other'}`;
-                div.innerHTML = `<b>${data.user}:</b> ${data.message}`;
-                document.getElementById('messages').appendChild(div);
-                document.getElementById('messages').scrollTop = 9999;
+            
+            // If they were in a private chat, restore that too
+            if (currentRoom && currentRoom !== "null") {
+                socket.emit('join_private', { room_id: currentRoom });
+                showChat(myD);
             }
-        });
-        document.getElementById('m-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') send();
-});
+        }
+    };
 
-        socket.on('load_history', (msgs) => {
-            document.getElementById('messages').innerHTML = "";
-            msgs.forEach(m => {
-                const div = document.createElement('div');
-                div.className = `msg ${m.sender === myN ? 'my' : 'other'}`;
-                div.innerHTML = `<b>${m.sender}:</b> ${m.content}`;
-                document.getElementById('messages').appendChild(div);
+    async function join() {
+        myN = document.getElementById('username').value;
+        myH = document.getElementById('hospital').value;
+        myR = document.getElementById('role').value;
+
+        if (!myN.trim()) return alert("Please enter a name");
+
+        if(myR === 'Doctor') {
+            const res = await fetch('/verify-code', {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({
+                    hospital: myH, 
+                    code: document.getElementById('accessCode').value,
+                    name: myN // Send name to server for session storage
+                })
             });
-        });
+            if(!(await res.json()).success) return alert("Wrong Code");
+            myD = myN;
+        }
 
-        function end() {
-    if(confirm("End this consultation?")) {
-        socket.emit('end_session_global', {
-            hospital: myH, 
-            doctor: myD, 
-            room_id: currentRoom // Tell the server which room to clear
-        });
+        // Save to localStorage so refresh works
+        localStorage.setItem('n', myN); 
+        localStorage.setItem('h', myH); 
+        localStorage.setItem('r', myR); 
+        localStorage.setItem('d', myD);
+        
+        uiLobby();
+        socket.emit('join', {name: myN, hospital: myH, role: myR, doctor_name: myD});
     }
-}
 
-      socket.on('force_exit_session', (data) => {
-    if(myD === data.doctor) {
-        localStorage.removeItem('d'); 
-        localStorage.removeItem('currR'); // 👈 ADD THIS: Clean up the room key
-        myD = null;
-        currentRoom = null; // 👈 ADD THIS: Reset local variable
-        document.getElementById('chat-container').style.display = 'none';
-        document.getElementById('login-container').style.display = 'block';
-        document.getElementById('messages').innerHTML = "";
+    // FIX: The keys here must match the keys in join()
+    function logout() {
+        if(confirm("Are you sure you want to logout?")) {
+            // Tell the server to kill the session
+            fetch('/logout', {method: 'POST'}).then(() => {
+                // Clear the exact keys used
+                localStorage.removeItem('n');
+                localStorage.removeItem('h');
+                localStorage.removeItem('r');
+                localStorage.removeItem('d');
+                localStorage.removeItem('currR');
+                
+                // Reload to reset the whole app state
+                window.location.reload();
+            });
+        }
     }
-});
-    </script>
+
+    function uiLobby() {
+        document.getElementById('join-btn').disabled = true;
+        document.getElementById('join-btn').innerText = "In Lobby";
+        // Show logout button always if logged in
+        document.getElementById('logout-btn').style.display = 'block';
+        if(myR === 'Patient') document.getElementById('doc-list').style.display = 'block';
+    }
+
+    // ... (keep your socket.on handlers for messages and room events the same) ...
+
+</script>
 </body>
 </html>
