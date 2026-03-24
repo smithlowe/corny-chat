@@ -78,6 +78,38 @@ def handle_message(data):
         'message': message,
         'hospital': hosp
     }, to=hosp)
+    from flask import request, jsonify
+import uuid  # This helps give every file a unique name
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file selected"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "Empty filename"}), 400
+
+    try:
+        # 1. Create a unique name (e.g., "7a2b-patient-xray.jpg")
+        file_ext = file.filename.split('.')[-1]
+        unique_name = f"{uuid.uuid4()}.{file_ext}"
+        
+        # 2. Read the file bytes
+        file_data = file.read()
+        
+        # 3. Upload to Supabase 'medical-files' bucket
+        storage_path = f"uploads/{unique_name}"
+        supabase.storage.from_('medical-files').upload(storage_path, file_data)
+        
+        # 4. Get the Public URL
+        file_url = supabase.storage.from_('medical-files').get_public_url(storage_path)
+        
+        return jsonify({"success": True, "url": file_url})
+    
+    except Exception as e:
+        print(f"Upload Error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     # Use eventlet's wsgi server for local testing

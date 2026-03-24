@@ -139,6 +139,32 @@
             msgDiv.appendChild(div);
             msgDiv.scrollTop = msgDiv.scrollHeight;
         });
+        function uploadMedicalFile() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // This sends the link to the chat room instantly!
+            socket.emit('send_message', {
+                user: userName,
+                message: `📎 Attached File: <a href="${data.url}" target="_blank">${file.name}</a>`,
+                hospital: currentHospital
+            });
+        } else {
+            alert("Upload failed: " + data.error);
+        }
+    });
+}
 
         socket.on('status', (data) => {
             const msgDiv = document.getElementById('messages');
