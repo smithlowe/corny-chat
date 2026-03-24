@@ -38,6 +38,11 @@
             <option value="Mukono">Mukono Clinic</option>
         </select>
         <button onclick="join()">JOIN LOBBY</button>
+        <input type="file" id="fileInput" style="display: none;" onchange="uploadMedicalFile()">
+
+<button type="button" onclick="document.getElementById('fileInput').click()" style="font-size: 20px; cursor: pointer;">
+    📎
+</button>
     </div>
 
     <div id="chat-container">
@@ -139,10 +144,13 @@
             msgDiv.appendChild(div);
             msgDiv.scrollTop = msgDiv.scrollHeight;
         });
-        function uploadMedicalFile() {
+       function uploadMedicalFile() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     if (!file) return;
+
+    // Show a small "Uploading..." message if you want
+    console.log("Uploading: " + file.name);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -154,16 +162,18 @@
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // This sends the link to the chat room instantly!
+            // This sends the link to the chat room
             socket.emit('send_message', {
-                user: userName,
-                message: `📎 Attached File: <a href="${data.url}" target="_blank">${file.name}</a>`,
+                user: userName, // Make sure this variable matches your app
+                message: `📎 File: <a href="${data.url}" target="_blank">${file.name}</a>`,
                 hospital: currentHospital
             });
+            fileInput.value = ''; // Reset the picker
         } else {
             alert("Upload failed: " + data.error);
         }
-    });
+    })
+    .catch(err => console.error("Error:", err));
 }
 
         socket.on('status', (data) => {
