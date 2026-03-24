@@ -40,8 +40,7 @@
         <button onclick="join()">JOIN LOBBY</button>
         <input type="file" id="fileInput" style="display: none;" onchange="uploadMedicalFile()">
 
-<button type="button" onclick="document.getElementById('fileInput').click()" style="font-size: 20px; cursor: pointer;">
-    📎
+
 </button>
     </div>
 
@@ -54,6 +53,8 @@
         <div class="chat-input-area">
             <input type="text" id="m-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')send()">
             <button onclick="send()" style="width:auto; margin:0;">Send</button>
+            <button type="button" onclick="document.getElementById('fileInput').click()" style="font-size: 20px; cursor: pointer;">
+    📎
         </div>
     </div>
 
