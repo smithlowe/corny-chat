@@ -184,6 +184,39 @@
             div.textContent = data.msg;
             msgDiv.appendChild(div);
         });
+        let myUsername = "";
+let myRoom = "";
+
+function login() {
+    myUsername = document.getElementById('username').value;
+    myRoom = document.getElementById('room_id').value;
+
+    if (myUsername && myRoom) {
+        // 1. Tell the server to put us in this specific room
+        socket.emit('join', { user: myUsername, room: myRoom });
+
+        // 2. Hide login and show chat
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('chat-room').style.display = 'block';
+        
+        console.log(`Joined Room: ${myRoom} as ${myUsername}`);
+    } else {
+        alert("Please enter both a Name and a Room ID!");
+    }
+}
+
+function sendMessage() {
+    const message = document.getElementById('messageInput').value;
+    if (message.trim() !== "") {
+        // 3. Send the message ONLY to people in 'myRoom'
+        socket.emit('send_message', {
+            user: myUsername,
+            message: message,
+            room: myRoom  // This matches the 'room' variable in app.py
+        });
+        document.getElementById('messageInput').value = "";
+    }
+}
     </script>
 </body>
 </html>
