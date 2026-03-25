@@ -7,81 +7,103 @@
     <link rel="icon" href="data:,">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
+        /* 🎨 Global & Layout Styles */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
         #login-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 320px; text-align: center; }
+        
         #chat-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; flex-direction: column; }
+        
         input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 14px; }
+        
         button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
         button:hover { background: #0056b3; }
+        
         .btn-red { background: #dc3545; }
-        #messages { flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; display: flex; flex-direction: column; gap: 10px; }
-        .msg { padding: 10px 15px; border-radius: 18px; max-width: 75%; word-wrap: break-word; font-size: 15px; }
-        .my { align-self: flex-end; background: #007bff; color: white; border-bottom-right-radius: 2px; }
-        .other { align-self: flex-start; background: #e4e6eb; color: #050505; border-bottom-left-radius: 2px; }
-        .chat-header { background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .chat-input-area { padding: 15px; display: flex; gap: 10px; border-top: 1px solid #ddd; background: white; }
+
+        /* 💬 Chat Bubbles */
+        .msg { padding: 10px 15px; border-radius: 18px; max-width: 75%; word-wrap: break-word; font-size: 15px; margin-bottom: 8px; display: block; }
+        .my { align-self: flex-end !important; background: #007bff; color: white; border-bottom-right-radius: 2px; }
+        .other { align-self: flex-start !important; background: #e4e6eb; color: #050505; border-bottom-left-radius: 2px; }
+
+        /* 🏥 Header */
+        .chat-header { background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 1001; box-sizing: border-box; }
+
+        /* 📜 Messages Container */
+        #messages { margin-top: 70px; margin-bottom: 130px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 15px; background: #f9f9f9; height: calc(100vh - 200px); flex: 1; }
+
+        /* 📥 The Input Area (Fixed to Bottom) */
+        .chat-input-area { position: fixed; bottom: 0; left: 0; width: 100%; padding: 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #ddd; background: white; z-index: 1000; box-sizing: border-box; }
+
+        /* 🛡️ Login Overlay */
+        #login-overlay { background: #f0f2f5; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
-    <div id="login-overlay" style="background: white; position: fixed; width: 100%; height: 100%; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-    <div style="border: 1px solid #ccc; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);">
-        <h2 style="color: #007bff;">🏥 Corny-Comm Portal</h2>
-        <p>Please enter your details to join the consultation.</p>
-        
-        <input type="text" id="username" placeholder="Your Name" style="width: 100%; padding: 10px; margin-bottom: 10px;">
-        <input type="text" id="room_id" placeholder="Consultation ID (e.g. ROOM-101)" style="width: 100%; padding: 10px; margin-bottom: 20px;">
-        
-        <button onclick="login()" style="width: 100%; background: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">
-            Enter Consultation
-        </button>
-    </div>
-</div>
 
-    <div id="login-container">
-        <h2 style="color: #007bff; margin-top: 0;">🏥 Corny-Comm</h2>
-        <input type="text" id="username" placeholder="Your Full Name">
-        <select id="role" onchange="document.getElementById('accessCode').style.display=(this.value=='Doctor'?'block':'none')">
-            <option value="Patient">I am a Patient</option>
-            <option value="Doctor">I am a Doctor</option>
-        </select>
-        <input type="password" id="accessCode" placeholder="Doctor Access Code" style="display:none;">
-        <select id="hospital">
-            <option value="Mulago">Mulago Hospital</option>
-            <option value="Nakasero">Nakasero Hospital</option>
-            <option value="Mukono">Mukono Clinic</option>
-        </select>
-        <button onclick="join()">JOIN LOBBY</button>
-        <input type="file" id="fileInput" name="file" style="display: none;" onchange="uploadMedicalFile()">
+    <div id="login-overlay">
+        <div style="background: white; padding: 30px; border-radius: 15px; box-shadow: 0px 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center;">
+            <h2 style="color: #007bff; margin-bottom: 10px;">🏥 Corny-Comm Portal</h2>
+            <p style="color: #65676b; margin-bottom: 20px;">Please enter your details to join the consultation.</p>
+            
+            <input type="text" id="username" placeholder="Your Full Name">
+            
+            <select id="role" onchange="document.getElementById('accessCodeWrapper').style.display=(this.value=='Doctor'?'block':'none')">
+                <option value="Patient">I am a Patient</option>
+                <option value="Doctor">I am a Doctor</option>
+            </select>
 
-</button>
-    </div>
+            <div id="accessCodeWrapper" style="display:none;">
+                <input type="password" id="accessCode" placeholder="Doctor Access Code">
+            </div>
 
-    <div id="chat-container">
-        <div class="chat-input-area">
-    <div id="uploadContainer" style="display:none; width: 100%; background: #eee; border-radius: 5px; margin-bottom: 8px; overflow: hidden;">
-        <div id="progressBar" style="width: 0%; height: 15px; background: #00d1b2; border-radius: 5px; text-align: center; color: white; font-size: 10px; line-height: 15px; transition: width 0.3s;">
-            0%
+            <select id="hospital">
+                <option value="Mulago">Mulago Hospital</option>
+                <option value="Nakasero">Nakasero Hospital</option>
+                <option value="Mukono">Mukono Clinic</option>
+            </select>
+
+            <input type="text" id="room_id" placeholder="Consultation ID (e.g. ROOM-101)">
+            
+            <button onclick="join()">JOIN LOBBY</button>
         </div>
     </div>
 
-    <input type="text" id="m-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')send()">
-    
-    <button onclick="send()" style="width:auto; margin:0;">Send</button>
-    
-    <button type="button" onclick="document.getElementById('fileInput').click()" style="font-size: 20px; cursor: pointer; background: none; border: none;">
-        📎
-    </button>
+    <div id="chat-container">
+        <div class="chat-header">
+            <span id="chat-status">🟢 Active Consultation</span>
+            <button onclick="logout()" class="btn-red" style="width:auto; margin:0; padding: 5px 15px;">LEAVE</button>
+        </div>
 
-    <input type="file" id="fileInput" style="display: none;" onchange="uploadMedicalFile()">
-</div>
+        <div id="messages">
+            </div>
+
+        <div class="chat-input-area">
+            <div id="uploadContainer" style="display:none; width: 100%; background: #eee; border-radius: 10px; overflow: hidden;">
+                <div id="progressBar" style="width: 0%; height: 12px; background: #00d1b2; transition: width 0.3s; color: white; font-size: 10px; text-align: center; line-height: 12px;">0%</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="m-input" placeholder="Type a message..." style="flex: 1; margin: 0;" onkeypress="if(event.key==='Enter')send()">
+                
+                <button type="button" onclick="document.getElementById('fileInput').click()" style="width: auto; background: none; border: none; font-size: 24px; cursor: pointer; color: #555;">📎</button>
+                
+                <button onclick="send()" style="width: auto; margin: 0; padding: 10px 20px; border-radius: 20px;">Send</button>
+            </div>
+
+            <input type="file" id="fileInput" style="display: none;" onchange="uploadMedicalFile()">
+        </div>
     </div>
 
     <script>
-        // FIX: Force WebSocket transport for Render compatibility
-       var socket = io({
-    transports: ['websocket', 'polling'],
-    upgrade: true
-});
+        // WebSocket Initialization
+        var socket = io({
+            transports: ['websocket', 'polling'],
+            upgrade: true
+        });
+
+        let myUsername = "";
+        let myRoom = "";
 
         // Check for existing session
         document.addEventListener('DOMContentLoaded', () => {
@@ -92,13 +114,16 @@
         });
 
         function showChatUI() {
-            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('chat-container').style.display = 'flex';
         }
 
         function rejoinRoom() {
+            myUsername = localStorage.getItem('n');
+            myRoom = localStorage.getItem('r_id');
             socket.emit('join', { 
-                name: localStorage.getItem('n'), 
+                user: myUsername, 
+                room: myRoom,
                 hospital: localStorage.getItem('h'), 
                 role: localStorage.getItem('r') 
             });
@@ -106,11 +131,12 @@
 
         async function join() {
             const user = document.getElementById('username').value.trim();
+            const room = document.getElementById('room_id').value.trim();
             const role = document.getElementById('role').value;
             const hosp = document.getElementById('hospital').value;
             const code = document.getElementById('accessCode').value;
 
-            if (!user) return alert("Please enter your name");
+            if (!user || !room) return alert("Please enter your name and Room ID");
 
             if (role === 'Doctor') {
                 const res = await fetch('/verify-code', {
@@ -122,102 +148,48 @@
                 if (!data.success) return alert("Invalid Code!");
             }
 
+            myUsername = user;
+            myRoom = room;
+
             localStorage.setItem('n', user);
             localStorage.setItem('h', hosp);
             localStorage.setItem('r', role);
+            localStorage.setItem('r_id', room);
 
             showChatUI();
-            rejoinRoom();
+            socket.emit('join', { user: myUsername, room: myRoom });
         }
 
-       function send() {
-    const input = document.getElementById('m-input');
-    if (!input.value) return;
+        function send() {
+            const input = document.getElementById('m-input');
+            if (!input.value.trim()) return;
 
-    socket.emit('send_message', {
-        user: localStorage.getItem('n'), // Your saved name
-        message: input.value,
-        room_id: myRoom // This must match the 'room_id' in app.py
-    });
-    
-    input.value = "";
-}
+            socket.emit('send_message', {
+                user: myUsername,
+                message: input.value,
+                room_id: myRoom
+            });
+            input.value = "";
+        }
+
         function logout() {
             localStorage.clear();
             window.location.reload();
         }
 
         // LISTENERS
-       socket.on('receive_message', function(data) {
-    const messagesContainer = document.getElementById('messages');
-    const msgDiv = document.createElement('div');
-    
-    // 🎨 Style the bubble (Optional)
-    msgDiv.style.margin = "10px 0";
-    msgDiv.style.padding = "10px";
-    msgDiv.style.borderRadius = "8px";
-    msgDiv.style.backgroundColor = "#f1f1f1";
-
-    // 🖼️ CRITICAL: Use .innerHTML so the <img> tag works!
-    msgDiv.innerHTML = `<strong>${data.user}:</strong> <br> ${data.message}`;
-    
-    messagesContainer.appendChild(msgDiv);
-    
-    // 📜 Auto-scroll to the bottom so the doctor sees the new image
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-});
-      function uploadMedicalFile() {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-    if (!file) return;
-
-    // Show a small console log so you know it started
-    console.log("Starting upload for:", file.name);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // 1. Upload to your Flask server
-    fetch('/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            let mediaTag = "";
-
-            // 2. Build the correct HTML tag based on file type
-            if (file.type.startsWith('image/')) {
-                // This displays the image directly in the chat
-                mediaTag = `<img src="${data.url}" style="max-width: 100%; border-radius: 10px; display: block; margin: 10px 0;" loading="lazy">`;
-            } else if (file.type.startsWith('video/')) {
-                // This displays a playable video player
-                mediaTag = `<video src="${data.url}" controls style="max-width: 100%; border-radius: 10px;"></video>`;
-            } else {
-                // Fallback for PDF or other medical documents
-                mediaTag = `📎 <a href="${data.url}" target="_blank" style="color: cyan;">View Document: ${file.name}</a>`;
-            }
-
-            // 3. Send the HTML tag to everyone in the room
-            socket.emit('send_message', {
-                user: localStorage.getItem('n'),
-                message: mediaTag, 
-                room_id: myRoom
-            });
+        socket.on('receive_message', function(data) {
+            const messagesContainer = document.getElementById('messages');
+            const msgDiv = document.createElement('div');
             
-            // 4. Clear the input so you can upload another one
-            fileInput.value = ''; 
-        } else {
-            alert("Upload failed: " + data.error);
-        }
-    })
-    .catch(err => {
-        console.error("Upload Error:", err);
-        alert("Check your internet connection and try again.");
-    });
-}
- // This closes the whole uploadMedicalFile() function
+            const isMe = data.user === myUsername;
+            msgDiv.className = `msg ${isMe ? 'my' : 'other'}`;
+            msgDiv.innerHTML = `<strong>${data.user}:</strong> <br> ${data.message}`;
+            
+            messagesContainer.appendChild(msgDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+
         socket.on('status', (data) => {
             const msgDiv = document.getElementById('messages');
             const div = document.createElement('div');
@@ -225,41 +197,58 @@
             div.textContent = data.msg;
             msgDiv.appendChild(div);
         });
-        let myUsername = "";
-let myRoom = "";
 
+        function uploadMedicalFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return;
 
-    myUsername = document.getElementById('username').value;
-    myRoom = document.getElementById('room_id').value;
+            const container = document.getElementById('uploadContainer');
+            const bar = document.getElementById('progressBar');
+            container.style.display = 'block';
 
-   function login() {
-    const nameInput = document.getElementById('username').value;
-    const roomInput = document.getElementById('room_id').value;
+            const formData = new FormData();
+            formData.append('file', file);
 
-    if (nameInput && roomInput) {
-        myUsername = nameInput;
-        myRoom = roomInput;
+            // Use XMLHttpRequest to track progress
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    bar.style.width = percent + '%';
+                    bar.innerText = percent + '%';
+                }
+            };
 
-        // Save it so the message listener can "see" who we are
-        localStorage.setItem('n', myUsername); 
+            xhr.onload = function() {
+                container.style.display = 'none';
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    let mediaTag = "";
 
-        socket.emit('join', { user: myUsername, room: myRoom });
-        document.getElementById('login-overlay').style.display = 'none';
-    }
-}
+                    if (file.type.startsWith('image/')) {
+                        mediaTag = `<img src="${data.url}" style="max-width: 100%; border-radius: 10px; display: block; margin: 10px 0;">`;
+                    } else if (file.type.startsWith('video/')) {
+                        mediaTag = `<video src="${data.url}" controls style="max-width: 100%; border-radius: 10px;"></video>`;
+                    } else {
+                        mediaTag = `📎 <a href="${data.url}" target="_blank" style="color: #007bff;">View Document: ${file.name}</a>`;
+                    }
 
-function sendMessage() {
-    const message = document.getElementById('messageInput').value;
-    if (message.trim() !== "") {
-        // 3. Send the message ONLY to people in 'myRoom'
-        socket.emit('send_message', {
-            user: myUsername,
-            message: message,
-            room: myRoom  // This matches the 'room' variable in app.py
-        });
-        document.getElementById('messageInput').value = "";
-    }
-}
+                    socket.emit('send_message', {
+                        user: myUsername,
+                        message: mediaTag, 
+                        room_id: myRoom
+                    });
+                    fileInput.value = ''; 
+                } else {
+                    alert("Upload failed.");
+                }
+            };
+
+            xhr.open('POST', '/upload', true);
+            xhr.send(formData);
+        }
     </script>
 </body>
 </html>
