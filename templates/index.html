@@ -125,24 +125,18 @@
             rejoinRoom();
         }
 
-        function send() {
-            const input = document.getElementById('m-input');
-            const message = input.value.trim();
-            const user = localStorage.getItem('n');
-            const hosp = localStorage.getItem('h');
+       function send() {
+    const input = document.getElementById('m-input');
+    if (!input.value) return;
 
-            if (message) {
-                // FIX: Match these keys with your app.py handle_message logic
-                socket.emit('send_message', {
-                    user: user,
-                    message: message,
-                    hospital: hosp,
-                    room_id: hosp 
-                });
-                input.value = '';
-            }
-        }
-
+    socket.emit('send_message', {
+        user: localStorage.getItem('n'), // Your saved name
+        message: input.value,
+        room_id: myRoom // This must match the 'room_id' in app.py
+    });
+    
+    input.value = "";
+}
         function logout() {
             localStorage.clear();
             window.location.reload();

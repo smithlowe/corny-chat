@@ -51,12 +51,19 @@ def on_join(data):
 
 @socketio.on('send_message')
 def handle_message(data):
-    """Sends message ONLY to the people in the specified room and saves to DB"""
-    # 1. Get the data from the incoming message
+    # 🔍 CHECK THIS: Use 'room_id' to match your JavaScript
+    room = data.get('room_id') 
     user = data.get('user')
     message = data.get('message')
-    room_id = data.get('room') 
 
+    if room:
+        emit('receive_message', {
+            'user': user,
+            'message': message,
+            'room_id': room # Keep the name consistent
+        }, to=room)
+    else:
+        print("❌ ERROR: No room_id found in message data!")
     # 2. BROADCAST (This was missing!)
     # This sends the data back to the 'receive_message' listener in index.html
     emit('receive_message', {
