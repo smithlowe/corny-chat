@@ -78,25 +78,30 @@
         <div id="messages">
             </div>
 
-        <div class="chat-input-area">
+        <div class="chat-input-area" style="padding: 10px; background: white; border-top: 1px solid #eee;">
     <div id="uploadContainer" style="display:none; width: 100%; background: #eee; border-radius: 10px; overflow: hidden; margin-bottom: 8px;">
         <div id="progressBar" style="width: 0%; height: 12px; background: #00d1b2; transition: width 0.3s; color: white; font-size: 10px; text-align: center; line-height: 12px;">0%</div>
     </div>
 
-    <div style="display: flex; gap: 8px; align-items: center;">
+    <div style="display: flex; gap: 6px; align-items: center; width: 100%;">
         
-        <div class="mic-container" style="display: flex; align-items: center; gap: 5px;">
-            <span id="timer-display" style="color: #dc3545; font-weight: bold; font-family: monospace; display: none; font-size: 13px;">0:00</span>
+        <div class="mic-container" style="display: flex; align-items: center; position: relative; flex-shrink: 0;">
+            <span id="timer-display" style="position: absolute; top: -30px; left: 0; color: #dc3545; font-weight: bold; font-family: monospace; display: none; background: white; padding: 2px 6px; border-radius: 5px; border: 1px solid #ddd; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">0:00</span>
+            
             <button type="button" id="mic-btn" style="background: #007bff; color: white; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: none; font-size: 20px;">
                 🎤
             </button>
         </div>
 
-        <input type="text" id="m-input" placeholder="Type a message..." style="flex: 1; padding: 12px; border-radius: 20px; border: 1px solid #ddd; outline: none; font-size: 15px;" onkeypress="if(event.key==='Enter')send()">
+        <input type="text" id="m-input" placeholder="Type message..." 
+               style="flex-grow: 1; min-width: 0; padding: 12px 15px; border-radius: 25px; border: 1px solid #ddd; outline: none; font-size: 16px; height: 42px;" 
+               onkeypress="if(event.key==='Enter')send()">
         
-        <button type="button" onclick="document.getElementById('fileInput').click()" style="background:none; border:none; font-size:22px; cursor:pointer; padding: 0 5px; color: #555;">📎</button>
+        <button type="button" onclick="document.getElementById('fileInput').click()" 
+                style="background:none; border:none; font-size:22px; cursor:pointer; padding: 0 5px; color: #555; flex-shrink: 0;">📎</button>
         
-        <button onclick="send()" style="background: #007bff; color: white; border: none; padding: 10px 18px; border-radius: 20px; font-weight: bold; cursor: pointer;">Send</button>
+        <button onclick="send()" 
+                style="background: #007bff; color: white; border: none; height: 42px; padding: 0 15px; border-radius: 25px; font-weight: bold; cursor: pointer; flex-shrink: 0;">Send</button>
     </div>
 
     <input type="file" id="fileInput" style="display: none;" onchange="uploadMedicalFile()">
