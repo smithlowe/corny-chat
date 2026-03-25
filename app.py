@@ -73,21 +73,49 @@ def verify():
     return jsonify({"success": False, "message": "Incorrect passcode for " + str(hospital)})
 
 # 5. SOCKET.IO EVENTS (Handling Real-time Chat)
+# 5. SOCKET.IO EVENTS (Handling Real-time Chat + Database)
+# 5. SOCKET.IO EVENTS (Updated for your 6-column Medical Table)
 @socketio.on('join')
 def on_join(data):
-    # Use .get('room') or .get('room_id') depending on your JS
-    room = data.get('room') or data.get('room_id') 
+    room = data.get('hospital') # Matches your 'hospital' column
+    user = data.get('user')
     join_room(room)
-    emit('receive_message', {'user': 'SYSTEM', 'message': f'{data.get("user")} joined the room.'}, to=room)
+    
+    try:
+        # Fetch history for this specific hospital
+        response = supabase.table("messages") \
+            .select("*") \
+            .eq("hospital", room) \
+            .order("created_at", desc=False) \
+            .execute()
+        
+        for m in response.data:
+            emit('receive_message', {
+                'user': m['sender'], 
+                'message': m['content']
+            })
+    except Exception as e:
+        print(f"Error: {e}")
 
 @socketio.on('send_message')
 def handle_message(data):
-    room = data.get('room_id')
-    emit('receive_message', {
-        'user': data.get('user'),
-        'message': data.get('message')
-    }, to=room)
+    # Mapping your app data to your 6 columns
+    hospital_id = data.get('hospital')
+    sender_name = data.get('user')
+    message_text = data.get('message')
+    doc_name = data.get('doctor_name') # Using your doctor_name column
 
+    try:
+        supabase.table("messages").insert({
+            "sender": sender_name,
+            "content": message_text,
+            "hospital": hospital_id,
+            "doctor_name": doc_name
+        }).execute()
+    except Exception as e:
+        print(f"Save Error: {e}")
+
+    emit('receive_message', {'user': sender_name, 'message': message_text}, to=hospital_id)
 # 6. SERVER START (Always at the absolute bottom)
 if __name__ == '__main__':
     socketio.run(app)
