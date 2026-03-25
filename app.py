@@ -24,7 +24,7 @@ def handle_message(data):
     room_id = data.get('room')
     
     # 'to=room_id' is the secret sauce for privacy!
-    emit('receive_message', data, to=room_id)s
+    emit('receive_message', data, to=room_id)
     
     # 💾 SAVE TO SUPABASE
     if supabase:
