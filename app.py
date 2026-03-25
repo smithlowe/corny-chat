@@ -25,7 +25,7 @@ supabase = create_client(supabase_url, supabase_key)
 def index():
     return render_template('index.html')
 
-    @app.route('/verify-code', methods=['POST'])
+@app.route('/verify-code', methods=['POST'])
 def verify():
     data = request.json
     hospital = data.get('hospital')
