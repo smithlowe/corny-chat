@@ -142,24 +142,36 @@
         }
 
         // LISTENERS
-        socket.on('receive_message', (data) => {
-            const msgDiv = document.getElementById('messages');
-            const div = document.createElement('div');
-            const isMe = data.user === localStorage.getItem('n');
-            div.className = isMe ? 'msg my' : 'msg other';
-            div.innerHTML = `<strong>${data.user}</strong><br>${data.message}`;
-            msgDiv.appendChild(div);
-            msgDiv.scrollTop = msgDiv.scrollHeight;
-        });
+       socket.on('receive_message', function(data) {
+    const messagesContainer = document.getElementById('messages');
+    const msgDiv = document.createElement('div');
+    
+    // 🎨 Style the bubble (Optional)
+    msgDiv.style.margin = "10px 0";
+    msgDiv.style.padding = "10px";
+    msgDiv.style.borderRadius = "8px";
+    msgDiv.style.backgroundColor = "#f1f1f1";
+
+    // 🖼️ CRITICAL: Use .innerHTML so the <img> tag works!
+    msgDiv.innerHTML = `<strong>${data.user}:</strong> <br> ${data.message}`;
+    
+    messagesContainer.appendChild(msgDiv);
+    
+    // 📜 Auto-scroll to the bottom so the doctor sees the new image
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
       function uploadMedicalFile() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     if (!file) return;
 
+    // Show a small console log so you know it started
+    console.log("Starting upload for:", file.name);
+
     const formData = new FormData();
     formData.append('file', file);
 
-    // 1. Send the file to your /upload route first
+    // 1. Upload to your Flask server
     fetch('/upload', {
         method: 'POST',
         body: formData
@@ -167,20 +179,37 @@
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // 2. ONLY NOW do we send the message to the chat
-            // data.url is the link (e.g., https://supabase...video.mp4)
+            let mediaTag = "";
+
+            // 2. Build the correct HTML tag based on file type
+            if (file.type.startsWith('image/')) {
+                // This displays the image directly in the chat
+                mediaTag = `<img src="${data.url}" style="max-width: 100%; border-radius: 10px; display: block; margin: 10px 0;" loading="lazy">`;
+            } else if (file.type.startsWith('video/')) {
+                // This displays a playable video player
+                mediaTag = `<video src="${data.url}" controls style="max-width: 100%; border-radius: 10px;"></video>`;
+            } else {
+                // Fallback for PDF or other medical documents
+                mediaTag = `📎 <a href="${data.url}" target="_blank" style="color: cyan;">View Document: ${file.name}</a>`;
+            }
+
+            // 3. Send the HTML tag to everyone in the room
             socket.emit('send_message', {
-                user: localStorage.getItem('n'), 
-                message: `📎 <a href="${data.url}" target="_blank" style="color: cyan; text-decoration: underline;">View Media: ${file.name}</a>`,
+                user: localStorage.getItem('n'),
+                message: mediaTag, 
                 room_id: myRoom
             });
             
-            fileInput.value = ''; // Reset the input
+            // 4. Clear the input so you can upload another one
+            fileInput.value = ''; 
         } else {
             alert("Upload failed: " + data.error);
         }
     })
-    .catch(err => console.error("Upload Error:", err));
+    .catch(err => {
+        console.error("Upload Error:", err);
+        alert("Check your internet connection and try again.");
+    });
 }
  // This closes the whole uploadMedicalFile() function
         socket.on('status', (data) => {
