@@ -55,22 +55,23 @@ def handle_message(data):
     # 1. Get the data from the incoming message
     user = data.get('user')
     message = data.get('message')
-    room_id = data.get('room') # Use 'room' to match your JavaScript
+    room_id = data.get('room') 
 
-    # 2. Privacy: Send ONLY to that specific room
+    # 2. BROADCAST (This was missing!)
+    # This sends the data back to the 'receive_message' listener in index.html
     emit('receive_message', {
         'user': user,
         'message': message,
         'room': room_id
     }, to=room_id)
-    
-    # 3. 💾 SAVE TO SUPABASE (Optional, but good for history)
+
+    # 3. 💾 SAVE TO SUPABASE (Keep this if you want history)
     if supabase and room_id:
         try:
             supabase.table("messages").insert({
                 "user_name": user, 
                 "content": message, 
-                "room_id": room_id # Changed 'hospital' to 'room_id' for your new setup
+                "room_id": room_id 
             }).execute()
         except Exception as e:
             print(f"Supabase Error: {e}")

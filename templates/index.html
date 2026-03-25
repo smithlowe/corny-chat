@@ -205,19 +205,18 @@ let myRoom = "";
     myRoom = document.getElementById('room_id').value;
 
    function login() {
-    myUsername = document.getElementById('username').value;
-    myRoom = document.getElementById('room_id').value;
+    const nameInput = document.getElementById('username').value;
+    const roomInput = document.getElementById('room_id').value;
 
-    if (myUsername && myRoom) {
-        // 1. Tell the server to link us to this ID
+    if (nameInput && roomInput) {
+        myUsername = nameInput;
+        myRoom = roomInput;
+
+        // Save it so the message listener can "see" who we are
+        localStorage.setItem('n', myUsername); 
+
         socket.emit('join', { user: myUsername, room: myRoom });
-
-        // 2. HIDE the portal and SHOW the chat
         document.getElementById('login-overlay').style.display = 'none';
-        
-        console.log(`Linked to Room: ${myRoom}`);
-    } else {
-        alert("Please enter your Name and the ID provided by the clinic!");
     }
 }
 
