@@ -101,27 +101,31 @@ def on_join(data):
 
 @socketio.on('send_message')
 def handle_message(data):
-    print(f"DEBUG - Data Received: {data}") # Check your VS Code terminal for this!
-    
-    # We must use the exact keys your JavaScript is sending
-    room = data.get('hospital') or data.get('room_id')
-    user = data.get('user')
-    msg = data.get('message')
-    doc = data.get('doctor_name', 'No Doctor Assigned')
+    # 🔍 1. Log exactly what the phone is sending
+    print(f"DEBUG: Data from phone: {data}")
+
+    # 📥 2. Extract data with safety defaults
+    msg = data.get('message', '')
+    sender = data.get('user', 'Anonymous')
+    hosp = data.get('hospital', 'General')
+    doc = data.get('doctor_name', 'System')
 
     try:
-        # Save to your 6-column table
+        # 💾 3. Insert into your 6-column Supabase table
+        # Ensure these match your Supabase column names EXACTLY
         supabase.table("messages").insert({
-            "sender": user,
+            "sender": sender,
             "content": msg,
-            "hospital": room,
+            "hospital": hosp,
             "doctor_name": doc
         }).execute()
+
+        # 🚀 4. Send it back to the screen
+        emit('receive_message', {'user': sender, 'message': msg}, to=hosp)
         
-        # ONLY emit if the save was successful
-        emit('receive_message', {'user': user, 'message': msg}, to=room)
     except Exception as e:
-        print(f"Database Save Error: {e}")
+        # ❌ This will show up in Render Logs if it fails
+        print(f"DATABASE ERROR: {e}")
 # 6. SERVER START (Always at the absolute bottom)
 if __name__ == '__main__':
     socketio.run(app)

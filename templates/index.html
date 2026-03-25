@@ -281,15 +281,17 @@
         }
 
         function send() {
-    const input = document.getElementById('m-input');
-    if (!input.value.trim()) return;
-
-    socket.emit('send_message', {
-        user: myUsername, // Uses the global variable
-        message: input.value,
-        room_id: myRoom    // Uses the global variable
-    });
-    input.value = "";
+    var msg = document.getElementById('m-input').value;
+    if (msg.trim() !== "") {
+        // 🚀 These keys MUST match your Python data.get() calls
+        socket.emit('send_message', {
+            message: msg,
+            user: username,         // This will go into 'sender'
+            hospital: currentRoom,  // This will go into 'hospital'
+            doctor_name: "Dr. Mulinda" // This will go into 'doctor_name'
+        });
+        document.getElementById('m-input').value = ''; // Clears the box
+    }
 }
 
         function logout() {
