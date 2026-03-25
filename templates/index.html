@@ -282,15 +282,20 @@
 
         function send() {
     var msg = document.getElementById('m-input').value;
-    if (msg.trim() !== "") {
-        // 🚀 These keys MUST match your Python data.get() calls
+    
+    // 🚀 Use 'myRoom' and 'myUsername' because those are what you defined!
+    if (msg.trim() !== "" && myRoom !== "") {
         socket.emit('send_message', {
             message: msg,
-            user: username,         // This will go into 'sender'
-            hospital: currentRoom,  // This will go into 'hospital'
-            doctor_name: "Dr. Mulinda" // This will go into 'doctor_name'
+            user: myUsername,      // Matches your 'myUsername' variable
+            hospital: myRoom,      // Matches your 'myRoom' variable
+            doctor_name: "Dr. Mulinda" // Matches your Supabase column
         });
-        document.getElementById('m-input').value = ''; // Clears the box
+        
+        // Clear the input on your screen
+        document.getElementById('m-input').value = '';
+    } else {
+        console.error("Cannot send: Room or Username is missing!");
     }
 }
 
