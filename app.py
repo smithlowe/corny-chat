@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()  # 👈 THIS MUST BE THE VERY FIRST LINE
+
 import os
 import uuid
 from flask import Flask, render_template, request, jsonify
@@ -7,8 +10,9 @@ from supabase import create_client, Client
 # 1. INITIALIZATION
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
+# 🚀 Force SocketIO to use 'eventlet' mode
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # Supabase Setup (Ensure these are in your Render Environment Variables)
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
