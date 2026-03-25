@@ -151,41 +151,38 @@
             msgDiv.appendChild(div);
             msgDiv.scrollTop = msgDiv.scrollHeight;
         });
-       function uploadMedicalFile() {
+      function uploadMedicalFile() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     if (!file) return;
 
-    // Show a small "Uploading..." message if you want
-    console.log("Uploading: " + file.name);
-
     const formData = new FormData();
     formData.append('file', file);
 
+    // 1. Send the file to your /upload route first
     fetch('/upload', {
         method: 'POST',
         body: formData
     })
     .then(response => response.json())
     .then(data => {
-     if (data.success) {
-            // 🚀 Broadcast to the room
+        if (data.success) {
+            // 2. ONLY NOW do we send the message to the chat
+            // data.url is the link (e.g., https://supabase...video.mp4)
             socket.emit('send_message', {
                 user: localStorage.getItem('n'), 
-                message: `📎 <a href="${data.url}" target="_blank" style="color: #007bff; text-decoration: underline;">View File: ${file.name}</a>`,
-                room_id: myRoom 
+                message: `📎 <a href="${data.url}" target="_blank" style="color: cyan; text-decoration: underline;">View Media: ${file.name}</a>`,
+                room_id: myRoom
             });
             
-            fileInput.value = ''; 
-            console.log("✅ File link broadcasted to room:", myRoom);
+            fileInput.value = ''; // Reset the input
         } else {
             alert("Upload failed: " + data.error);
         }
-    }) // This closes the .then(data => {
-    .catch(err => {
-        console.error("❌ Network Error:", err);
-    });
-} // This closes the whole uploadMedicalFile() function
+    })
+    .catch(err => console.error("Upload Error:", err));
+}
+ // This closes the whole uploadMedicalFile() function
         socket.on('status', (data) => {
             const msgDiv = document.getElementById('messages');
             const div = document.createElement('div');
