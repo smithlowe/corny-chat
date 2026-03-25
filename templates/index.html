@@ -51,8 +51,7 @@
             <option value="Mukono">Mukono Clinic</option>
         </select>
         <button onclick="join()">JOIN LOBBY</button>
-        <input type="file" id="fileInput" style="display: none;" onchange="uploadMedicalFile()">
-
+        <input type="file" id="fileInput" name="file" style="display: none;" onchange="uploadMedicalFile()">
 
 </button>
     </div>
@@ -169,21 +168,24 @@
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            // This sends the link to the chat room
+     if (data.success) {
+            // 🚀 Broadcast to the room
             socket.emit('send_message', {
-                user: userName, // Make sure this variable matches your app
-                message: `📎 File: <a href="${data.url}" target="_blank">${file.name}</a>`,
-                hospital: currentHospital
+                user: localStorage.getItem('n'), 
+                message: `📎 <a href="${data.url}" target="_blank" style="color: #007bff; text-decoration: underline;">View File: ${file.name}</a>`,
+                room_id: myRoom 
             });
-            fileInput.value = ''; // Reset the picker
+            
+            fileInput.value = ''; 
+            console.log("✅ File link broadcasted to room:", myRoom);
         } else {
             alert("Upload failed: " + data.error);
         }
-    })
-    .catch(err => console.error("Error:", err));
-}
-
+    }) // This closes the .then(data => {
+    .catch(err => {
+        console.error("❌ Network Error:", err);
+    });
+} // This closes the whole uploadMedicalFile() function
         socket.on('status', (data) => {
             const msgDiv = document.getElementById('messages');
             const div = document.createElement('div');
