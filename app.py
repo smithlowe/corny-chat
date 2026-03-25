@@ -9,6 +9,11 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # --- SUPABASE SETUP ---
+HOSPITAL_CODES = {
+    "Mulago": "MUL-2026",
+    "Nsambya": "NSB-77",
+    "CityMedical": "CITY-DOC"
+}
 # Ensure your environment variables are set in Render
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
@@ -19,6 +24,17 @@ supabase = create_client(supabase_url, supabase_key)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+    @app.route('/verify-code', methods=['POST'])
+def verify():
+    data = request.json
+    hospital = data.get('hospital')
+    code_entered = data.get('code')
+
+    if HOSPITAL_CODES.get(hospital) == code_entered:
+        return jsonify({"success": True})
+    else:
+        return jsonify({"success": False, "error": "Invalid Doctor Code!"})
 
 # --- SOCKET EVENTS ---
 @socketio.on('join')
