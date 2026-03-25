@@ -75,7 +75,8 @@ def verify():
 # 5. SOCKET.IO EVENTS (Handling Real-time Chat)
 @socketio.on('join')
 def on_join(data):
-    room = data.get('room')
+    # Use .get('room') or .get('room_id') depending on your JS
+    room = data.get('room') or data.get('room_id') 
     join_room(room)
     emit('receive_message', {'user': 'SYSTEM', 'message': f'{data.get("user")} joined the room.'}, to=room)
 
