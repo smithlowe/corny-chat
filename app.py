@@ -54,10 +54,23 @@ def verify():
     hospital = data.get('hospital')
     code_entered = data.get('code')
     
-    # Simple logic: replace '1234' with your actual secure code
-    if code_entered == "1234":
+    # 🏥 Hospital Secret Codes (You can change these to anything!)
+    # Mulinda, update these codes to your preferred passwords:
+    passcodes = {
+        "Mulago": "MUL-2026",
+        "Nakasero": "NAK-555",
+        "Mukono": "MUK-888"
+    }
+
+    # Check if the code matches the selected hospital
+    if hospital in passcodes and code_entered == passcodes[hospital]:
         return jsonify({"success": True})
-    return jsonify({"success": False, "message": "Invalid Code"})
+    
+    # If it's a Developer/Admin role (Optional extra)
+    if code_entered == "ADMIN-99":
+        return jsonify({"success": True})
+
+    return jsonify({"success": False, "message": "Incorrect passcode for " + str(hospital)})
 
 # 5. SOCKET.IO EVENTS (Handling Real-time Chat)
 @socketio.on('join')
