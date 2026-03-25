@@ -77,12 +77,13 @@ def verify():
 # 5. SOCKET.IO EVENTS (Updated for your 6-column Medical Table)
 @socketio.on('join')
 def on_join(data):
-    room = data.get('hospital') # Matches your 'hospital' column
-    user = data.get('user')
+    # Use 'hospital' as the room ID since that is your column name
+    room = data.get('hospital') or data.get('room_id') or "default_room"
+    user = data.get('user', 'Unknown')
     join_room(room)
     
     try:
-        # Fetch history for this specific hospital
+        # Fetch history where hospital matches the room
         response = supabase.table("messages") \
             .select("*") \
             .eq("hospital", room) \
@@ -90,32 +91,33 @@ def on_join(data):
             .execute()
         
         for m in response.data:
-            emit('receive_message', {
-                'user': m['sender'], 
-                'message': m['content']
-            })
+            emit('receive_message', {'user': m.get('sender'), 'message': m.get('content')})
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Fetch Error: {e}")
 
 @socketio.on('send_message')
 def handle_message(data):
-    # Mapping your app data to your 6 columns
-    hospital_id = data.get('hospital')
-    sender_name = data.get('user')
-    message_text = data.get('message')
-    doc_name = data.get('doctor_name') # Using your doctor_name column
+    print(f"DEBUG - Data Received: {data}") # Check your VS Code terminal for this!
+    
+    # We must use the exact keys your JavaScript is sending
+    room = data.get('hospital') or data.get('room_id')
+    user = data.get('user')
+    msg = data.get('message')
+    doc = data.get('doctor_name', 'No Doctor Assigned')
 
     try:
+        # Save to your 6-column table
         supabase.table("messages").insert({
-            "sender": sender_name,
-            "content": message_text,
-            "hospital": hospital_id,
-            "doctor_name": doc_name
+            "sender": user,
+            "content": msg,
+            "hospital": room,
+            "doctor_name": doc
         }).execute()
+        
+        # ONLY emit if the save was successful
+        emit('receive_message', {'user': user, 'message': msg}, to=room)
     except Exception as e:
-        print(f"Save Error: {e}")
-
-    emit('receive_message', {'user': sender_name, 'message': message_text}, to=hospital_id)
+        print(f"Database Save Error: {e}")
 # 6. SERVER START (Always at the absolute bottom)
 if __name__ == '__main__':
     socketio.run(app)
