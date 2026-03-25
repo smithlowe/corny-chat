@@ -1,17 +1,32 @@
-from flask_socketio import join_room, leave_room, emit
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, join_room, leave_room, emit
+from supabase import create_client
+import os
 
-# ... (keep your Supabase and App setup at the top)
+app = Flask(__name__)
 
+# Fixed: Removed the 's' at the end of this line
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# --- SUPABASE SETUP ---
+# Ensure your environment variables are set in Render
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
+supabase = create_client(supabase_url, supabase_key)
+
+# --- SOCKET EVENTS ---
+# --- THE HOME PAGE (Crucial or the site won't load!) ---
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# --- SOCKET EVENTS ---
 @socketio.on('join')
 def on_join(data):
-    """Triggered when a user enters a private room"""
     username = data.get('user')
-    room_id = data.get('room')  # This will be the Patient's unique name or ID
-    
+    room_id = data.get('room')
     join_room(room_id)
     print(f"🏥 CLINIC ONLINE: {username} has entered Private Room: {room_id}")
-    
-    # Optional: Notify the room that someone arrived
     emit('receive_message', {
         'user': 'SYSTEM',
         'message': f'{username} has joined the consultation.',
@@ -20,23 +35,29 @@ def on_join(data):
 
 @socketio.on('send_message')
 def handle_message(data):
-    """Sends message ONLY to the people in the specified room"""
-    room_id = data.get('room')
+    """Sends message ONLY to the people in the specified room and saves to DB"""
+    # 1. Get the data from the incoming message
+    user = data.get('user')
+    message = data.get('message')
+    room_id = data.get('room') # Use 'room' to match your JavaScript
+
+    # 2. Privacy: Send ONLY to that specific room
+    emit('receive_message', {
+        'user': user,
+        'message': message,
+        'room': room_id
+    }, to=room_id)
     
-    # 'to=room_id' is the secret sauce for privacy!
-    emit('receive_message', data, to=room_id)
-    
-    # 💾 SAVE TO SUPABASE
-    if supabase:
+    # 3. 💾 SAVE TO SUPABASE (Optional, but good for history)
+    if supabase and room_id:
         try:
             supabase.table("messages").insert({
                 "user_name": user, 
                 "content": message, 
-                "hospital": hosp
+                "room_id": room_id # Changed 'hospital' to 'room_id' for your new setup
             }).execute()
         except Exception as e:
             print(f"Supabase Error: {e}")
-
     # 📢 BROADCAST REAL-TIME
     emit('receive_message', {
         'user': user,
