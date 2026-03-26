@@ -195,31 +195,35 @@ socket.on('remove_patient_from_list', (data) => {
 });
         // 1. PRIVATE CONSULTATION LOGIC
        // 1. UPDATED: Request with GPS Location
-async function testConsultation() {
-    const u = document.getElementById('username').value;
-    const h = document.getElementById('hospSelect').value;
+function testConsultation() {
+    const name = document.getElementById('username').value;
+    const hosp = document.getElementById('hospSelect').value;
 
-    if (!u) return alert("Please enter your Full Name first");
+    if (!name) return alert("Please enter your name!");
 
-    // Get Location (to help prioritize Mukono/Wakiso hospitals)
-    navigator.geolocation.getCurrentPosition((pos) => {
-        myUser = u;
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
+    myUser = name;
 
-        console.log(`Requesting consultation at ${h} with GPS...`);
-        
-        socket.emit('request_consultation', {
-            user: u,
-            hospital_id: h,
-            lat: lat,
-            lon: lon
-        });
-    }, (err) => {
-        alert("Please enable Location to find the nearest hospital.");
+    // 1. Tell Python: "I have paid, put me in the queue for this hospital"
+    socket.emit('patient_paid_and_waiting', { 
+        patient_name: name, 
+        hospital: hosp 
     });
-}
 
+    // 2. UI Switch: Show a "Waiting for Doctor" screen instead of the Chat
+    document.getElementById('login-overlay').style.display = 'none';
+    
+    // Create a simple waiting message if you don't have a specific div for it
+    const waitingArea = document.createElement('div');
+    waitingArea.id = "patient-waiting-screen";
+    waitingArea.innerHTML = `
+        <div style="text-align:center; padding:50px; font-family:sans-serif;">
+            <h2 style="color: orange;">⏳ Payment Verified!</h2>
+            <p>Please hold on, <strong>${name}</strong>. We are notifying the doctors at <strong>${hosp}</strong>.</p>
+            <div class="loader"></div> <p style="color: #666;">A doctor will join you shortly...</p>
+        </div>
+    `;
+    document.body.appendChild(waitingArea);
+}
 // 2. UPDATED: Wait for Payment before showing Chat
 socket.on('payment_prompt', (data) => {
     const phone = prompt(`🏥 Hospital: ${data.hospital}\n💰 Fee: UGX ${data.fee}\n\nEnter MTN/Airtel number for Mobile Money:`);
@@ -279,16 +283,18 @@ function acceptPatient(sid) {
 
 socket.on('match_found', (data) => {
     myRoom = data.session_id;
-    localStorage.setItem('n', myUser);
-    localStorage.setItem('r', myRoom);
+    
+    // 1. Remove the "Waiting" screen we created above
+    const waitingScreen = document.getElementById('patient-waiting-screen');
+    if (waitingScreen) waitingScreen.remove();
 
-    // Only NOW do we hide the login screen for the patient
-    document.getElementById('login-overlay').style.display = 'none';
+    // 2. Now, and ONLY now, show the chat container
     document.getElementById('chat-container').style.display = 'flex';
 
-    // 4. Move patient into the private chat room
+    // 3. Join the private room created by the doctor
     socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
-    alert("✅ Payment Verified! Room ID: " + data.session_id);
+    
+    alert("👨‍⚕️ A doctor has accepted your request! Starting consultation...");
 });
         // 2. JOIN & LOGOUT LOGIC
         async function join() {
