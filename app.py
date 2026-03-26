@@ -44,35 +44,60 @@ def verify():
 @socketio.on('join')
 def on_join(data):
     room = data.get('hospital')
-    if room:
-        join_room(room)
-        # 🔒 PRIVACY: No history fetch here. New joins start with a clean screen.
-        print(f"User joined active session: {room}")
-
+    user_role = data.get('role') # We pass 'Doctor' or 'Patient'
+    
+    # If a Doctor tries to join a private consultation room
+    if user_role == 'Doctor' and room.startswith('cons-'):
+        # Check Supabase if this specific session is PAID
+        check = supabase.table("consultations").select("status").eq("session_id", room).single().execute()
+        
+        if check.data and check.data['status'] == 'paid':
+            join_room(room)
+            emit('system_msg', {'msg': 'Doctor has entered the verified session.'}, to=room)
+        else:
+            emit('error', {'msg': 'Access Denied: Payment not verified for this session.'})
+    else:
+        # Patients can always join their own requested rooms
+        join_room(room) 
 @socketio.on('request_consultation')
 def handle_request(data):
     patient = data.get('user')
     hospital = data.get('hospital_id')
+    lat = data.get('lat')
+    lon = data.get('lon')
     
-    # Create a unique private room ID
     session_id = f"cons-{uuid.uuid4().hex[:8]}" 
     
-    try:
-        # Store this request in Supabase so doctors can see it
-        supabase.table("consultations").insert({
-            "session_id": session_id,
-            "patient_name": patient,
-            "hospital_id": hospital,
-            "status": "pending"
-        }).execute()
-        
-        # Tell the patient to join this private room
-        emit('match_found', {'session_id': session_id})
-        
-        # Notify all online doctors at that hospital
-        emit('new_consultation_request', {'patient': patient, 'session_id': session_id}, to=hospital)
-    except Exception as e:
-        print(f"DB Error: {e}")
+    # 💰 Record the 5,000 UGX fee and your 1,000 UGX commission
+    supabase.table("consultations").insert({
+        "session_id": session_id,
+        "patient_name": patient,
+        "hospital_id": hospital,
+        "amount_paid": 5000,
+        "platform_fee": 1000, 
+        "is_paid": False, # 🔒 Locked
+        "patient_lat": lat,
+        "patient_lon": lon
+    }).execute()
+    
+    emit('payment_prompt', {
+        'session_id': session_id,
+        'fee': 5000,
+        'hospital': hospital
+    })
+@socketio.on('join')
+def on_join(data):
+    room = data.get('hospital')
+    role = data.get('role')
+
+    if room.startswith('cons-') and role == 'Doctor':
+        # 🛡️ THE LOCK: Check if is_paid is True in Supabase
+        check = supabase.table("consultations").select("is_paid").eq("session_id", room).single().execute()
+        if not check.data or not check.data.get('is_paid'):
+            emit('error', {'msg': '🛑 Access Denied: Payment not verified for this session.'})
+            return 
+
+    join_room(room)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')

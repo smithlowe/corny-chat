@@ -99,36 +99,56 @@
         let mediaRecorder, audioChunks = [], timerInterval, seconds = 0;
 
         // 1. PRIVATE CONSULTATION LOGIC
-        async function testConsultation() { // Fixed: 'async' was 'sync'
-            const u = document.getElementById('username').value;
-            const h = document.getElementById('hospSelect').value;
+       // 1. UPDATED: Request with GPS Location
+async function testConsultation() {
+    const u = document.getElementById('username').value;
+    const h = document.getElementById('hospSelect').value;
 
-            if (!u) return alert("Please enter your Full Name first");
-            
-            myUser = u; 
-            console.log(`Requesting private consultation at ${h} for ${u}...`);
-            
-            socket.emit('request_consultation', {
-                user: u,
-                hospital_id: h
-            });
-        }
+    if (!u) return alert("Please enter your Full Name first");
 
-        // Listen for the Private Room ID from Python (Only ONE listener needed)
-        socket.on('match_found', (data) => {
-            console.log("Private Session Created:", data.session_id);
-            
-            myRoom = data.session_id;
-            localStorage.setItem('n', myUser);
-            localStorage.setItem('r', myRoom);
+    // Get Location (to help prioritize Mukono/Wakiso hospitals)
+    navigator.geolocation.getCurrentPosition((pos) => {
+        myUser = u;
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
 
-            // Hide Login and Show Chat
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('chat-container').style.display = 'flex';
-
-            socket.emit('join', { hospital: myRoom, user: myUser });
-            alert("Consultation Started! Your Private ID: " + data.session_id);
+        console.log(`Requesting consultation at ${h} with GPS...`);
+        
+        socket.emit('request_consultation', {
+            user: u,
+            hospital_id: h,
+            lat: lat,
+            lon: lon
         });
+    }, (err) => {
+        alert("Please enable Location to find the nearest hospital.");
+    });
+}
+
+// 2. UPDATED: Wait for Payment before showing Chat
+socket.on('payment_prompt', (data) => {
+    const phone = prompt(`🏥 Hospital: ${data.hospital}\n💰 Fee: UGX ${data.fee}\n\nEnter MTN/Airtel number for Mobile Money:`);
+    
+    if (phone) {
+        alert("Check your phone for the PIN prompt. System is verifying...");
+        // This tells Python to simulate a successful payment for testing
+        socket.emit('test_payment_success', { session_id: data.session_id });
+    }
+});
+
+// 3. UPDATED: Only join after Payment is Successful
+socket.on('match_found', (data) => {
+    myRoom = data.session_id;
+    localStorage.setItem('n', myUser);
+    localStorage.setItem('r', myRoom);
+
+    // Only NOW do we hide the login screen
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+
+    socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
+    alert("✅ Payment Verified! Room ID: " + data.session_id);
+});
 
         // 2. JOIN & LOGOUT LOGIC
         async function join() {
