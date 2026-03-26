@@ -58,21 +58,32 @@
     <div id="chat-container">
         <div class="chat-header"><span>🟢 Live Session</span><button onclick="logout()" style="background:#dc3545; padding:5px 10px;">LEAVE</button></div>
         <div id="messages"></div>
-        <div class="input-area">
-    <div style="position: relative; width: 50px; display: flex; justify-content: center;">
-        <div id="timer-display" style="display: none;">0:00</div> 
-        
-        <button id="mic-btn" style="background: #007bff; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; touch-action: none;">
-            🎤
-        </button>
+        <div class="input-area" style="display: flex; flex-direction: column; background: #fff; border-top: 1px solid #ddd;">
+    
+    <div id="upload-container" style="display: none; width: 100%; padding: 8px 15px; border-bottom: 1px solid #eee;">
+        <div style="background: #e9ecef; border-radius: 10px; height: 8px; width: 100%; overflow: hidden;">
+            <div id="upload-bar" style="background: #28a745; width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+            <small id="upload-text" style="font-size: 11px; color: #555; font-weight: bold;">Uploading: 0%</small>
+            <small style="font-size: 10px; color: #999;">Do not close</small>
+        </div>
     </div>
 
-    <input type="text" id="m-input" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
-    <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px; color: white;">📎</button>
-    <button onclick="send()">Send</button>
-</div>
-<input type="file" id="fIn" style="display:none" onchange="uploadFile()">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px;">
+        <div style="position: relative; width: 45px; display: flex; justify-content: center;">
+            <div id="timer-display" style="display: none; position: absolute; top: -40px; background: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;">0:00</div> 
+            <button id="mic-btn" style="background: #007bff; width: 42px; height: 42px; border-radius: 50%; border: none; font-size: 18px; touch-action: none; color: white;">🎤</button>
+        </div>
 
+        <input type="text" id="m-input" placeholder="Type medical query..." style="flex: 1; height: 40px; border-radius: 20px; border: 1px solid #ccc; padding: 0 15px;" onkeypress="if(event.key==='Enter')send()">
+        
+        <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px; color: white; border: none; display: flex; align-items: center; justify-content: center;">📎</button>
+        <button onclick="send()" style="background: #28a745; color: white; border-radius: 20px; padding: 0 15px; height: 40px; border: none; font-weight: bold;">Send</button>
+    </div>
+</div>
+
+<input type="file" id="fIn" style="display:none" onchange="uploadFile()">
     <script>
         let socket = io(), myUser = "", myRoom = "";
 
