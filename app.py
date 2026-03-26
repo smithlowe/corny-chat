@@ -41,24 +41,7 @@ def verify():
         return jsonify({"success": True})
     return jsonify({"success": False})
 
-@socketio.on('join')
-def on_join(data):
-    room = data.get('hospital')
-    user_role = data.get('role') # We pass 'Doctor' or 'Patient'
-    
-    # If a Doctor tries to join a private consultation room
-    if user_role == 'Doctor' and room.startswith('cons-'):
-        # Check Supabase if this specific session is PAID
-        check = supabase.table("consultations").select("status").eq("session_id", room).single().execute()
-        
-        if check.data and check.data['status'] == 'paid':
-            join_room(room)
-            emit('system_msg', {'msg': 'Doctor has entered the verified session.'}, to=room)
-        else:
-            emit('error', {'msg': 'Access Denied: Payment not verified for this session.'})
-    else:
-        # Patients can always join their own requested rooms
-        join_room(room) 
+
 @socketio.on('request_consultation')
 def handle_request(data):
     patient = data.get('user')
@@ -109,31 +92,74 @@ def handle_payment_master(data):
         }, room=hospital_lounge)
         
         print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
+@socketio.on('join_lounge')
+def handle_doctor_lounge(data):
+    doctor = data.get('doctor')
+    hosp = str(data.get('hospital', '')).lower() 
+    
+    if hosp:
+        lounge_room = f"lounge_{hosp}"
+        join_room(lounge_room)
+        print(f"👨‍⚕️ {doctor} is now ONLINE and listening in: {lounge_room}")
+    else:
+        print("⚠️ Doctor tried to join lounge but no hospital was provided.")
+
+@socketio.on('join')
+def on_join(data):
+    room = data.get('hospital')  # This is the session_id (e.g., cons-123)
+    role = data.get('role')
+    user = data.get('user')
+
+    # 🛡️ THE SECURITY LOCK
+    if room.startswith('cons-') and role == 'Doctor':
+        # Check if is_paid is True OR status is 'paid' (to cover both your DB versions)
+        check = supabase.table("consultations").select("*").eq("session_id", room).single().execute()
+        
+        if not check.data:
+            emit('error', {'msg': '🛑 Access Denied: Session not found.'})
+            return
+
+        is_paid = check.data.get('is_paid') or check.data.get('status') == 'paid'
+        
+        if not is_paid:
+            emit('error', {'msg': '🛑 Access Denied: Payment not verified for this session.'})
+            return 
+
+    # If security check passes (or if it's a patient), join the room
+    join_room(room)
+    emit('receive_message', {'user': 'System', 'message': f'{user} has joined the consultation.'}, to=room)
+    print(f"✅ {role} {user} joined private room: {room}")
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
     patient_name = data.get('patient_name')
-    hosp_id = data.get('hospital') 
+    # Get the hospital name, default to 'unknown' if missing
+    hosp_id = data.get('hospital', 'unknown') 
     
-    # Create the Unique Session ID
-    import uuid
+    # 1. Generate Session ID
     session_id = str(uuid.uuid4())[:8]
 
-    # Save to Supabase (Record the 5k transaction)
-    supabase.table("consultations").insert({
-        "session_id": session_id,
-        "patient_name": patient_name,
-        "hospital_id": hosp_id,
-        "status": "waiting"
-    }).execute()
+    # 2. Save to Supabase
+    try:
+        supabase.table("consultations").insert({
+            "session_id": session_id,
+            "patient_name": patient_name,
+            "hospital_id": hosp_id,
+            "status": "waiting",
+            "is_paid": True  # Ensure this is True so doctors can join later
+        }).execute()
+    except Exception as e:
+        print(f"❌ Supabase Error: {e}")
 
-    # Ping ONLY the doctors in that hospital's lounge
-    lounge_room = f"lounge_{hosp_id}"
+    # 3. 🛡️ SAFETY FIX: Ensure hosp_id is a string before calling .lower()
+    lounge_room = f"lounge_{str(hosp_id).lower()}"
+    
+    # 4. Broadcast to the Doctors
     emit('new_patient_waiting', {
         'patient_name': patient_name,
         'session_id': session_id
     }, room=lounge_room)
     
-    print(f"✅ {patient_name} is waiting for a doctor in {lounge_room}")
+    print(f"✅ {patient_name} is waiting in room: {lounge_room}")
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
@@ -151,19 +177,7 @@ def handle_acceptance(data):
     emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room)
     
     print(f"✅ Doctor {doc_name} accepted session {session_id}. Removed from {lounge_room} queue.")
-@socketio.on('join')
-def on_join(data):
-    room = data.get('hospital')
-    role = data.get('role')
 
-    if room.startswith('cons-') and role == 'Doctor':
-        # 🛡️ THE LOCK: Check if is_paid is True in Supabase
-        check = supabase.table("consultations").select("is_paid").eq("session_id", room).single().execute()
-        if not check.data or not check.data.get('is_paid'):
-            emit('error', {'msg': '🛑 Access Denied: Payment not verified for this session.'})
-            return 
-
-    join_room(room)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')
