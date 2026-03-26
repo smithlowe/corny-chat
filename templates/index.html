@@ -203,22 +203,14 @@ function testConsultation() {
 
     if (!name) return alert("Please enter your name first!");
 
-    // 1. Get Phone Number
-    let phone = prompt(`🏥 Hospital: ${hosp}\n💰 Consultation Fee: 5,000 UGX\n\nEnter 10-digit Mobile Money Number:`);
+    let phone = prompt(`🏥 Hospital: ${hosp}\n💰 Fee: 5,000 UGX\n\nEnter 10-digit Number:`);
+    if (!phone || !/^\d{10}$/.test(phone)) return alert("❌ Invalid number!");
 
-    if (!phone || !/^\d{10}$/.test(phone)) {
-        return alert("❌ Invalid number! Please enter exactly 10 digits.");
-    }
-
-    // 2. 🔑 GENERATE SESSION & JOIN IMMEDIATELY (The Fix)
     const session_id = "cons-" + Math.random().toString(36).substr(2, 9);
     myUser = name;
-    myRoom = session_id; 
+    myRoom = session_id;
 
-    // ✅ THIS IS THE KEY: Join the room BEFORE the waiting screen starts
-    socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
-
-    // 3. 🚀 NOTIFY THE DOCTORS
+    // 1. First, tell the server to create the session in Supabase
     socket.emit('patient_paid_and_waiting', { 
         patient_name: name, 
         hospital: hosp,
@@ -226,20 +218,15 @@ function testConsultation() {
         session_id: session_id 
     });
 
-    // 4. ⏳ SHOW THE WAITING SCREEN
+    // 2. ⏳ WAIT 1.5 SECONDS for the DB to save, then join
+    setTimeout(() => {
+        console.log("⏱️ Delay over, joining room now...");
+        socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
+    }, 1500); 
+
+    // 3. Show the waiting UI immediately
     document.getElementById('login-overlay').style.display = 'none';
-    const waitingArea = document.createElement('div');
-    waitingArea.id = "patient-waiting-screen";
-    waitingArea.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:3000;";
-    waitingArea.innerHTML = `
-        <div style="text-align:center; padding:30px; font-family:sans-serif; border: 2px solid orange; border-radius: 15px;">
-            <h2 style="color: orange;">⏳ Payment Verified!</h2>
-            <p>Hello <strong>${name}</strong>, we are notifying doctors at <strong>${hosp}</strong>.</p>
-            <div class="loader-spinner"></div>
-            <p style="color: #666;">A doctor will join you shortly. Do not close this page.</p>
-        </div>
-    `;
-    document.body.appendChild(waitingArea);
+    showWaitingScreen(name, hosp); // Use your existing UI code here
 }
 function enterClinic() {
     const docName = document.getElementById('username').value;
