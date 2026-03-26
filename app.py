@@ -158,24 +158,27 @@ def handle_acceptance(data):
     session_id = data.get('session_id')
     doc_name = data.get('doctor_name')
     
-    # 1. Get the session details from Supabase
+    # 1. Get the session details to find the hospital lounge
     res = supabase.table("consultations").select("hospital_id").eq("session_id", session_id).single().execute()
     
     if res.data:
         hosp_id = res.data['hospital_id']
         
-        # 2. Update the DB with the doctor's name
-        supabase.table("consultations").update({"doctor_name": doc_name}).eq("session_id", session_id).execute()
+        # 2. Update Supabase so we know which doctor is handling the case
+        supabase.table("consultations").update({"doctor_name": doc_name, "status": "active"}).eq("session_id", session_id).execute()
 
-        # 🚀 3. THE CRITICAL ADDITION: Tell the Patient to enter the chat
-        # We send 'match_found' to the private 'session_id' room
-        emit('match_found', {'session_id': session_id, 'doctor': doc_name}, room=session_id)
+        # 🚀 3. THE BRIDGE: Send 'match_found' to the PATIENT'S private room
+        # Without room=session_id, the patient will never hear the signal
+        emit('match_found', {
+            'session_id': session_id, 
+            'doctor': doc_name
+        }, room=session_id)
 
-        # 4. Cleanup: Remove the request for all other doctors in the lounge
+        # 4. CLEANUP: Tell all other doctors in the lounge to remove this patient from their list
         lounge_room = f"lounge_{str(hosp_id).lower()}"
         emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room)
         
-        print(f"✅ Doctor {doc_name} matched with session {session_id}")
+        print(f"✅ Connection Established: Dr. {doc_name} joined room {session_id}")
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')

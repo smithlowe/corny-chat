@@ -246,6 +246,24 @@ function testConsultation() {
     `;
     document.body.appendChild(waitingArea);
 }
+// 👂 PATIENT LISTENER: This waits for the Doctor to click "Accept"
+socket.on('match_found', (data) => {
+    console.log("✅ Match found! Entering chat with:", data.doctor);
+    
+    // 1. Remove the "Waiting" spinner screen
+    const waitingScreen = document.getElementById('patient-waiting-screen');
+    if (waitingScreen) waitingScreen.remove();
+
+    // 2. Reveal the Chat UI
+    document.getElementById('chat-container').style.display = 'flex';
+    
+    // 3. Update the UI to show which doctor joined
+    // If you have a span for the doctor's name, update it here
+    const docNameSpan = document.getElementById('display-doc-name');
+    if (docNameSpan) docNameSpan.innerText = "Consulting with: " + data.doctor;
+
+    alert("👨‍⚕️ A doctor has accepted your request! Starting consultation...");
+});
 function enterClinic() {
     const docName = document.getElementById('username').value;
     const hosp = document.getElementById('hospSelect').value;
