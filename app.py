@@ -106,29 +106,31 @@ def handle_doctor_lounge(data):
 
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
-    patient_name = data.get('patient_name')
-    hosp_id = data.get('hospital', 'unknown')
-    session_id = data.get('session_id') 
+    # Extract data from the frontend
+    p_name = data.get('patient_name')
+    h_id = data.get('hospital', 'unknown')
+    s_id = data.get('session_id')
 
-    # 1. FORCE SAVE TO DATABASE FIRST
     try:
+        # Match your SQL structure exactly
         supabase.table("consultations").insert({
-            "session_id": session_id,
-            "patient_name": patient_name,
-            "hospital_id": hosp_id,
-            "is_paid": True, # Verification happens here
-            "status": "waiting"
+            "session_id": s_id,
+            "patient_name": p_name,
+            "hospital_id": h_id,
+            "is_paid": True, # We set this to true to allow the doctor in
+            "status": "waiting",
+            "amount_paid": 5000,
+            "platform_fee": 1000
         }).execute()
-        print(f"✅ DB Record Created: {session_id}")
+        print(f"✅ Supabase updated: {s_id} is now LIVE.")
     except Exception as e:
-        print(f"❌ Supabase Insert Error: {e}")
+        print(f"❌ Supabase Error: {e}")
 
-    # 2. ONLY THEN NOTIFY DOCTORS
-    lounge_room = f"lounge_{str(hosp_id).lower()}"
+    # Now tell the doctors to look for this session_id
+    lounge_room = f"lounge_{str(h_id).lower()}"
     emit('new_patient_waiting', {
-        'patient_name': patient_name,
-        'session_id': session_id,
-        'hospital': hosp_id
+        'patient_name': p_name,
+        'session_id': s_id
     }, room=lounge_room)
 
 @socketio.on('join')
