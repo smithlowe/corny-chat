@@ -58,28 +58,32 @@
     <div id="chat-container">
         <div class="chat-header"><span>🟢 Live Session</span><button onclick="logout()" style="background:#dc3545; padding:5px 10px;">LEAVE</button></div>
         <div id="messages"></div>
-        <div class="input-area" style="display: flex; flex-direction: column; background: #fff; border-top: 1px solid #ddd;">
+        <div class="input-area" style="display: flex; flex-direction: column; background: #f8f9fa; border-top: 1px solid #ccc; position: relative;">
     
+    <div id="timer-display" style="display: none; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: rgba(220, 53, 69, 0.9); color: white; padding: 2px 12px; border-radius: 15px; font-size: 13px; font-weight: bold; z-index: 100;">0:00</div>
+
     <div id="upload-container" style="display: none; width: 100%; padding: 8px; background: #f1f1f1;">
-        <div style="background: #ccc; border-radius: 5px; height: 8px; width: 100%;">
+        <div style="background: #ccc; border-radius: 5px; height: 8px; width: 100%; overflow: hidden;">
             <div id="upload-bar" style="background: #28a745; width: 0%; height: 100%; transition: width 0.3s;"></div>
         </div>
         <small id="upload-text" style="font-size: 11px;">Uploading: 0%</small>
     </div>
 
     <div style="display: flex; align-items: center; gap: 10px; padding: 10px;">
-        <button id="mic-btn" style="background: #007bff; width: 40px; height: 40px; border-radius: 50%; color: white; border: none;">🎤</button>
+        <button id="mic-btn" style="background: #dc3545; width: 42px; height: 42px; border-radius: 50%; color: white; border: none; cursor: pointer; touch-action: none;">🎤</button>
         
-        <input type="text" id="m-input" placeholder="Type a message..." style="flex: 1; height: 35px; border-radius: 15px; border: 1px solid #ccc; padding-left: 10px;">
+        <input type="text" id="m-input" placeholder="Message..." style="flex: 1; height: 38px; border-radius: 20px; border: 1px solid #ccc; padding: 0 15px;" onkeypress="if(event.key==='Enter')send()">
         
         <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px; color: white; border: none;">📎</button>
-        <button onclick="send()" style="background: #28a745; color: white; border-radius: 5px; height: 35px; border: none; padding: 0 10px;">Send</button>
+        <button onclick="send()" style="background: #28a745; color: white; border-radius: 5px; height: 38px; border: none; padding: 0 15px; font-weight: bold;">Send</button>
     </div>
 </div>
 
-<input type="file" id="fIn" style="display:none" onchange="uploadFile()">    <script>
-        let socket = io(), myUser = "", myRoom = "";
+<input type="file" id="fIn" style="display:none" onchange="uploadFile()">
 
+<script>
+    let socket = io(), myUser = "", myRoom = "";
+    // Rest of your JS code follows below...
         // 1. INITIALIZATION & LISTENERS
 document.addEventListener('DOMContentLoaded', () => {
     const micBtn = document.getElementById('mic-btn');
