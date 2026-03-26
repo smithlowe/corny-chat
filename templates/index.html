@@ -36,34 +36,32 @@
 </head>
 <body>
     <div id="login-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f2f5; z-index: 2000; display: flex; align-items: center; justify-content: center;">
-        <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            <h2 style="color: #007bff; margin-bottom: 20px;">🏥 Corny-Comm</h2>
-            
-            <button onclick="testConsultation()" style="width: 100%; padding: 12px; background: orange; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 15px;">
-                Test Private Consultation
-            </button>
-            
-            <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 15px;">
+    <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <h2 style="color: #007bff; margin-bottom: 20px;">🏥 Corny-Comm</h2>
+        
+        <input type="text" id="username" placeholder="Your Full Name" style="width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;">
+        
+        <select id="hospSelect" style="width:100%; padding: 10px; margin-bottom:15px; border: 1px solid #ccc; border-radius: 5px;">
+            <option value="Mukono">Mukono General</option>
+            <option value="Wakiso">Wakiso Health IV</option>
+            <option value="Mulago">Mulago National</option>
+        </select>
 
-            <input type="text" id="username" placeholder="Full Name" style="width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;">
-            
-            <select id="role" style="width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;" onchange="document.getElementById('docCode').style.display=(this.value=='Doctor'?'block':'none')">
-                <option value="Patient">Patient</option>
-                <option value="Doctor">Doctor</option>
-            </select>
+        <p style="font-size: 12px; color: gray; margin-bottom: 5px;">FOR PATIENTS ONLY</p>
+        <button onclick="startPatientFlow()" style="width: 100%; padding: 12px; background: orange; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">
+            Pay & Request Consultation (5k)
+        </button>
+        
+        <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 20px;">
 
-            <input type="password" id="docCode" placeholder="Access Code" style="display:none; width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;">
-
-            <select id="hospSelect" style="width:100%; padding: 10px; margin-bottom:15px; border: 1px solid #ccc; border-radius: 5px;">
-                <option value="Mulago">Mulago</option>
-                <option value="Nakasero">Nakasero</option>
-                <option value="Mukono">Mukono</option>
-            </select>
-
-            <button onclick="login()" style="width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold;">Enter Clinic</button>
-        </div>
+        <p style="font-size: 12px; color: gray; margin-bottom: 5px;">FOR DOCTORS ONLY</p>
+        <input type="password" id="docCode" placeholder="Enter Doctor Access Code" style="width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;">
+        
+        <button onclick="startDoctorFlow()" style="width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+            Enter Doctor Lounge (Free)
+        </button>
     </div>
-
+</div>
     <div id="chat-container" style="display: none; height: 100vh; flex-direction: column;">
         <div class="chat-header" style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
             <span>🟢 Live Session</span>
@@ -97,7 +95,50 @@
 <script>
         let socket = io(), myUser = "", myRoom = "";
         let mediaRecorder, audioChunks = [], timerInterval, seconds = 0;
+        // 🟠 PATIENT FLOW: Triggered by Orange Button
+function startPatientFlow() {
+    const name = document.getElementById('username').value;
+    if (!name) return alert("Please enter your name to proceed.");
+    
+    myUser = name;
+    // This calls your payment prompt logic we built earlier
+    testConsultation(); 
+}
 
+// 🟢 DOCTOR FLOW: Triggered by Green Button
+// 🟢 DOCTOR FLOW: Specific Access Codes for each Hospital
+function startDoctorFlow() {
+    const name = document.getElementById('username').value;
+    const code = document.getElementById('docCode').value;
+    const hosp = document.getElementById('hospSelect').value;
+
+    if (!name) return alert("Doctor, please enter your name.");
+
+    // 🛡️ HOSPITAL CODE DATABASE
+    const hospitalCodes = {
+        "Mukono": "MUK256",    // Code for Mukono General
+        "Wakiso": "WAK412",    // Code for Wakiso Health IV
+        "Mulago": "MUL101",    // Code for Mulago National
+        "Nakasero": "NAK789"   // Code for Nakasero Hospital
+    };
+
+    // Check if the code matches the selected hospital
+    const correctCode = hospitalCodes[hosp];
+
+    if (code !== correctCode) {
+        return alert(`Invalid Access Code for ${hosp}. Please contact the Hospital Admin.`);
+    }
+
+    myUser = "Dr. " + name;
+    
+    // Join the specific Lounge (Free Entrance)
+    socket.emit('join_lounge', { doctor: myUser, hospital: hosp });
+    
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('doctor-dashboard').style.display = 'block';
+    
+    console.log(`${myUser} is now online at ${hosp}`);
+}
         // 1. PRIVATE CONSULTATION LOGIC
        // 1. UPDATED: Request with GPS Location
 async function testConsultation() {
