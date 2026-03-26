@@ -109,7 +109,7 @@ def handle_payment_master(data):
         }, room=hospital_lounge)
         
         print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
-        @socketio.on('doctor_accepted_patient')
+@socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
     doc_name = data.get('doctor_name')
