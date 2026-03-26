@@ -106,28 +106,34 @@ def handle_doctor_lounge(data):
 
 @socketio.on('join')
 def on_join(data):
-    room = data.get('hospital')  # This is the session_id (e.g., cons-123)
+    room = data.get('hospital')  # This is the session_id
     role = data.get('role')
     user = data.get('user')
 
     # 🛡️ THE SECURITY LOCK
     if room.startswith('cons-') and role == 'Doctor':
-        # Check if is_paid is True OR status is 'paid' (to cover both your DB versions)
-        check = supabase.table("consultations").select("*").eq("session_id", room).single().execute()
-        
-        if not check.data:
-            emit('error', {'msg': '🛑 Access Denied: Session not found.'})
+        try:
+            # We use .execute() and check if data exists instead of forcing .single()
+            res = supabase.table("consultations").select("*").eq("session_id", room).execute()
+            
+            if not res.data:
+                print(f"⚠️ Access Denied: Session {room} not found in DB.")
+                emit('error', {'msg': '🛑 Session not found.'})
+                return
+
+            session_data = res.data[0]
+            is_paid = session_data.get('is_paid') or session_data.get('status') == 'paid'
+            
+            if not is_paid:
+                emit('error', {'msg': '🛑 Payment not verified.'})
+                return 
+        except Exception as e:
+            print(f"❌ Supabase Error: {e}")
             return
 
-        is_paid = check.data.get('is_paid') or check.data.get('status') == 'paid'
-        
-        if not is_paid:
-            emit('error', {'msg': '🛑 Access Denied: Payment not verified for this session.'})
-            return 
-
-    # If security check passes (or if it's a patient), join the room
+    # If it's a patient or a verified doctor, join the room
     join_room(room)
-    emit('receive_message', {'user': 'System', 'message': f'{user} has joined the consultation.'}, to=room)
+    emit('receive_message', {'user': 'System', 'message': f'{user} has joined.'}, to=room)
     print(f"✅ {role} {user} joined private room: {room}")
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
