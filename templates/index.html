@@ -195,49 +195,48 @@ socket.on('remove_patient_from_list', (data) => {
 });
         // 1. PRIVATE CONSULTATION LOGIC
        // 1. UPDATED: Request with GPS Location
+// --- 🟠 CONSOLIDATED PATIENT FLOW ---
 function testConsultation() {
     const name = document.getElementById('username').value;
     const hosp = document.getElementById('hospSelect').value;
 
-    if (!name) return alert("Please enter your name!");
+    if (!name) return alert("Please enter your name first!");
 
+    // 1. 📱 PROMPT FOR PHONE (The "Automatic Verification" Start)
+    let phone = prompt(`🏥 Hospital: ${hosp}\n💰 Consultation Fee: 5,000 UGX\n\nEnter 10-digit Mobile Money Number:`);
+
+    // 2. 🛡️ STRICT 10-DIGIT CHECK
+    if (!phone || !/^\d{10}$/.test(phone)) {
+        return alert("❌ Invalid number! Please enter exactly 10 digits (e.g., 0770123456).");
+    }
+
+    alert("Confirming payment on your phone... Please wait.");
     myUser = name;
 
-    // 1. Tell Python: "I have paid, put me in the queue for this hospital"
+    // 3. 🚀 TELL PYTHON: "Payment Processed, Put me in Queue"
     socket.emit('patient_paid_and_waiting', { 
         patient_name: name, 
-        hospital: hosp 
+        hospital: hosp,
+        phone: phone 
     });
 
-    // 2. UI Switch: Show a "Waiting for Doctor" screen instead of the Chat
+    // 4. ⏳ SHOW WAITING SCREEN (Prevents going straight to chat)
     document.getElementById('login-overlay').style.display = 'none';
     
-    // Create a simple waiting message if you don't have a specific div for it
     const waitingArea = document.createElement('div');
     waitingArea.id = "patient-waiting-screen";
+    waitingArea.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:3000;";
     waitingArea.innerHTML = `
-        <div style="text-align:center; padding:50px; font-family:sans-serif;">
+        <div style="text-align:center; padding:30px; font-family:sans-serif; border: 2px solid orange; border-radius: 15px;">
             <h2 style="color: orange;">⏳ Payment Verified!</h2>
-            <p>Please hold on, <strong>${name}</strong>. We are notifying the doctors at <strong>${hosp}</strong>.</p>
-            <div class="loader"></div> <p style="color: #666;">A doctor will join you shortly...</p>
+            <p>Hello <strong>${name}</strong>, we are notifying doctors at <strong>${hosp}</strong>.</p>
+            <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid orange; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto;"></div>
+            <p style="color: #666;">A doctor will join you shortly. Do not close this page.</p>
         </div>
+        <style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
     `;
     document.body.appendChild(waitingArea);
 }
-// 2. UPDATED: Wait for Payment before showing Chat
-socket.on('payment_prompt', (data) => {
-    const phone = prompt(`🏥 Hospital: ${data.hospital}\n💰 Fee: UGX ${data.fee}\n\nEnter MTN/Airtel number for Mobile Money:`);
-    
-    if (phone) {
-        alert("Check your phone for the PIN prompt. System is verifying...");
-        // This tells Python to simulate a successful payment for testing
-        socket.emit('test_payment_success', { session_id: data.session_id });
-    }
-});
-
-// 3. UPDATED: Only join after Payment is Successful
-// --- DOCTOR LOGIC ---
-
 function enterClinic() {
     const docName = document.getElementById('username').value;
     const hosp = document.getElementById('hospSelect').value;

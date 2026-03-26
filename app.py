@@ -109,6 +109,31 @@ def handle_payment_master(data):
         }, room=hospital_lounge)
         
         print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
+@socketio.on('patient_paid_and_waiting')
+def handle_patient_waiting(data):
+    patient_name = data.get('patient_name')
+    hosp_id = data.get('hospital') 
+    
+    # Create the Unique Session ID
+    import uuid
+    session_id = str(uuid.uuid4())[:8]
+
+    # Save to Supabase (Record the 5k transaction)
+    supabase.table("consultations").insert({
+        "session_id": session_id,
+        "patient_name": patient_name,
+        "hospital_id": hosp_id,
+        "status": "waiting"
+    }).execute()
+
+    # Ping ONLY the doctors in that hospital's lounge
+    lounge_room = f"lounge_{hosp_id}"
+    emit('new_patient_waiting', {
+        'patient_name': patient_name,
+        'session_id': session_id
+    }, room=lounge_room)
+    
+    print(f"✅ {patient_name} is waiting for a doctor in {lounge_room}")
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
