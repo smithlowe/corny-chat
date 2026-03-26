@@ -157,15 +157,58 @@ async function startRecording() {
 
 function stopRecording() {
     if (mediaRecorder && mediaRecorder.state === "recording") {
+        
+        // 1. Tell the recorder what to do with the audio data when it stops
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            if (seconds >= 1) {
+                sendVoiceNote(blob); // 👈 THIS triggers your new function
+            }
+            // Cleanup: stop the mic hardware to save battery
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        };
+
+        // 2. Actually stop the recording
         mediaRecorder.stop();
         clearInterval(timerInterval);
         
+        // 3. Reset the UI
         document.getElementById('mic-btn').style.background = "#007bff";
         document.getElementById('mic-btn').style.transform = "scale(1)";
         document.getElementById('timer-display').style.display = "none";
     }
 }
 
+// Your sendVoiceNote function goes right here below it
+async function sendVoiceNote(blob) {
+    const fileName = `voice_${Date.now()}.webm`;
+    const formData = new FormData();
+    formData.append('file', blob, fileName);
+
+    try {
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const audioHTML = `<audio controls src="${result.url}" style="width: 200px; height: 35px;"></audio>`;
+            socket.emit('send_message', { 
+                message: audioHTML, 
+                user: myUser, 
+                hospital: myRoom, 
+                doctor_name: "Dr. Mulinda" 
+            });
+        } else {
+            alert("Upload Failed: " + (result.error || "Check Supabase Bucket name"));
+        }
+    } catch (err) {
+        console.error("Transmission Error:", err);
+        alert("Network Error: Make sure you are on HTTPS");
+    }
+}
         async function join() {
             const u = document.getElementById('username').value;
             const r = document.getElementById('rid').value;
