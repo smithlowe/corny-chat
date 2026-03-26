@@ -132,52 +132,50 @@ def on_join(data):
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
     patient_name = data.get('patient_name')
-    # Get the hospital name, default to 'unknown' if missing
-    hosp_id = data.get('hospital', 'unknown') 
-    
-    # 1. Generate Session ID
-    session_id = str(uuid.uuid4())[:8]
+    hosp_id = data.get('hospital', 'unknown')
+    # 🔑 Use the ID sent from the frontend
+    session_id = data.get('session_id') 
 
-    # 2. Save to Supabase
-    try:
-        supabase.table("consultations").insert({
-            "session_id": session_id,
-            "patient_name": patient_name,
-            "hospital_id": hosp_id,
-            "status": "waiting",
-            "is_paid": True  # Ensure this is True so doctors can join later
-        }).execute()
-    except Exception as e:
-        print(f"❌ Supabase Error: {e}")
+    # Save to Supabase
+    supabase.table("consultations").insert({
+        "session_id": session_id,
+        "patient_name": patient_name,
+        "hospital_id": hosp_id,
+        "status": "waiting",
+        "is_paid": True 
+    }).execute()
 
-    # 3. 🛡️ SAFETY FIX: Ensure hosp_id is a string before calling .lower()
     lounge_room = f"lounge_{str(hosp_id).lower()}"
     
-    # 4. Broadcast to the Doctors
     emit('new_patient_waiting', {
         'patient_name': patient_name,
         'session_id': session_id
     }, room=lounge_room)
     
-    print(f"✅ {patient_name} is waiting in room: {lounge_room}")
+    print(f"✅ {patient_name} waiting in {lounge_room} with ID: {session_id}")
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
     doc_name = data.get('doctor_name')
     
-    # Get hospital_id for this session to tell the right lounge
+    # 1. Get the session details from Supabase
     res = supabase.table("consultations").select("hospital_id").eq("session_id", session_id).single().execute()
-    hosp_id = res.data['hospital_id']
     
-    # Update Supabase to record which doctor took the case
-    supabase.table("consultations").update({"doctor_name": doc_name}).eq("session_id", session_id).execute()
+    if res.data:
+        hosp_id = res.data['hospital_id']
+        
+        # 2. Update the DB with the doctor's name
+        supabase.table("consultations").update({"doctor_name": doc_name}).eq("session_id", session_id).execute()
 
-    # Broadcast to all OTHER doctors in that hospital lounge to remove the button
-    lounge_room = f"lounge_{hosp_id}"
-    emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room)
-    
-    print(f"✅ Doctor {doc_name} accepted session {session_id}. Removed from {lounge_room} queue.")
+        # 🚀 3. THE CRITICAL ADDITION: Tell the Patient to enter the chat
+        # We send 'match_found' to the private 'session_id' room
+        emit('match_found', {'session_id': session_id, 'doctor': doc_name}, room=session_id)
 
+        # 4. Cleanup: Remove the request for all other doctors in the lounge
+        lounge_room = f"lounge_{str(hosp_id).lower()}"
+        emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room)
+        
+        print(f"✅ Doctor {doc_name} matched with session {session_id}")
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')

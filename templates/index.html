@@ -202,27 +202,33 @@ function testConsultation() {
 
     if (!name) return alert("Please enter your name first!");
 
-    // 1. 📱 PROMPT FOR PHONE (The "Automatic Verification" Start)
+    // 1. 📱 10-DIGIT VERIFICATION (REMAINS STRICT)
     let phone = prompt(`🏥 Hospital: ${hosp}\n💰 Consultation Fee: 5,000 UGX\n\nEnter 10-digit Mobile Money Number:`);
 
-    // 2. 🛡️ STRICT 10-DIGIT CHECK
     if (!phone || !/^\d{10}$/.test(phone)) {
         return alert("❌ Invalid number! Please enter exactly 10 digits (e.g., 0770123456).");
     }
 
-    alert("Confirming payment on your phone... Please wait.");
+    // 2. 🔑 GENERATE SESSION ID BEFORE EMITTING
+    // This ensures the patient and doctor have the same "Room Address"
+    const session_id = "cons-" + Math.random().toString(36).substr(2, 9);
     myUser = name;
+    myRoom = session_id; // Store globally so other functions can use it
 
-    // 3. 🚀 TELL PYTHON: "Payment Processed, Put me in Queue"
+    // 3. 📢 JOIN THE PRIVATE ROOM IMMEDIATELY
+    // This is the "Ear" that listens for the doctor's acceptance
+    socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
+
+    // 4. 🚀 NOTIFY THE DOCTORS (Now includes the session_id)
     socket.emit('patient_paid_and_waiting', { 
         patient_name: name, 
         hospital: hosp,
-        phone: phone 
+        phone: phone,
+        session_id: session_id 
     });
 
-    // 4. ⏳ SHOW WAITING SCREEN (Prevents going straight to chat)
+    // 5. ⏳ SHOW THE WAITING SCREEN (EXISTING UI)
     document.getElementById('login-overlay').style.display = 'none';
-    
     const waitingArea = document.createElement('div');
     waitingArea.id = "patient-waiting-screen";
     waitingArea.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:3000;";
@@ -230,10 +236,13 @@ function testConsultation() {
         <div style="text-align:center; padding:30px; font-family:sans-serif; border: 2px solid orange; border-radius: 15px;">
             <h2 style="color: orange;">⏳ Payment Verified!</h2>
             <p>Hello <strong>${name}</strong>, we are notifying doctors at <strong>${hosp}</strong>.</p>
-            <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid orange; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto;"></div>
+            <div class="loader-spinner"></div>
             <p style="color: #666;">A doctor will join you shortly. Do not close this page.</p>
         </div>
-        <style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
+        <style>
+            .loader-spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid orange; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
     `;
     document.body.appendChild(waitingArea);
 }
