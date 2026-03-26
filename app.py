@@ -133,26 +133,16 @@ def on_join(data):
 def handle_patient_waiting(data):
     patient_name = data.get('patient_name')
     hosp_id = data.get('hospital', 'unknown')
-    # 🔑 Use the ID sent from the frontend
     session_id = data.get('session_id') 
 
-    # Save to Supabase
-    supabase.table("consultations").insert({
-        "session_id": session_id,
-        "patient_name": patient_name,
-        "hospital_id": hosp_id,
-        "status": "waiting",
-        "is_paid": True 
-    }).execute()
-
+    # ✅ THE FIX: Force lowercase so "Mukono" becomes "lounge_mukono"
     lounge_room = f"lounge_{str(hosp_id).lower()}"
     
+    # ... rest of your code ...
     emit('new_patient_waiting', {
         'patient_name': patient_name,
         'session_id': session_id
     }, room=lounge_room)
-    
-    print(f"✅ {patient_name} waiting in {lounge_room} with ID: {session_id}")
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
@@ -176,7 +166,7 @@ def handle_acceptance(data):
 
         # 4. CLEANUP: Tell all other doctors in the lounge to remove this patient from their list
         lounge_room = f"lounge_{str(hosp_id).lower()}"
-        emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room)
+        emit('remove_apatient_from_list', {'session_id': session_id}, room=lounge_room)
         
         print(f"✅ Connection Established: Dr. {doc_name} joined room {session_id}")
 @socketio.on('send_message')

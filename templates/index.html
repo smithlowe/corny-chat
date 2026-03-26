@@ -186,11 +186,12 @@ function acceptPatient(sid) {
 }
 
 // C. This makes the request DISAPPEAR for other doctors in the same hospital
-socket.on('remove_patient_from_list', (data) => {
+// ❌ Change 'remove_patient_from_list' to 'remove_apatient_from_list'
+socket.on('remove_apatient_from_list', (data) => {
     const element = document.getElementById(`request-${data.session_id}`);
     if (element) {
         element.remove();
-        console.log(`Patient ${data.session_id} was taken by another doctor.`);
+        console.log(`Patient ${data.session_id} taken.`);
     }
 });
         // 1. PRIVATE CONSULTATION LOGIC
@@ -324,27 +325,17 @@ function acceptPatient(sid) {
 
 function send() {
     const i = document.getElementById('m-input');
-    
-    // Check if the input isn't empty and we are actually in a room
-    if (i.value.trim()) {
-        if (!myRoom) {
-            return alert("⚠️ You are not connected to a consultation room yet.");
-        }
-
-        console.log("📤 Sending message to room:", myRoom);
-
-        // 🚀 THE FIX: We MUST send 'hospital: myRoom' so the server 
-        // knows which specific patient/doctor should receive this.
+    if (i.value.trim() && myRoom) {
+        // ✅ Match the keys the Python server expects
         socket.emit('send_message', { 
             message: i.value, 
             user: myUser, 
-            hospital: myRoom 
+            hospital: myRoom,  // This is the session_id
+            doctor_name: myUser.startsWith('Dr.') ? myUser : "" 
         });
-
-        i.value = ""; // Clear input box
+        i.value = "";
     }
 }
-
         socket.on('receive_message', (data) => {
             renderMsg(data);
             let chat = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
