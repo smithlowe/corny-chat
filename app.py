@@ -106,7 +106,6 @@ def handle_doctor_lounge(data):
 
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
-    # Extract data from the frontend
     p_name = data.get('patient_name')
     h_id = data.get('hospital', 'unknown')
     s_id = data.get('session_id')
@@ -117,16 +116,16 @@ def handle_patient_waiting(data):
             "session_id": s_id,
             "patient_name": p_name,
             "hospital_id": h_id,
-            "is_paid": True, # We set this to true to allow the doctor in
+            "is_paid": True, # Verification happens here
             "status": "waiting",
             "amount_paid": 5000,
             "platform_fee": 1000
         }).execute()
-        print(f"✅ Supabase updated: {s_id} is now LIVE.")
+        print(f"✅ Supabase updated: {s_id} is now LIVE in the DB.")
     except Exception as e:
         print(f"❌ Supabase Error: {e}")
 
-    # Now tell the doctors to look for this session_id
+    # Now notify doctors in the lounge
     lounge_room = f"lounge_{str(h_id).lower()}"
     emit('new_patient_waiting', {
         'patient_name': p_name,
