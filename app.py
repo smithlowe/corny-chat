@@ -104,47 +104,49 @@ def handle_doctor_lounge(data):
     else:
         print("⚠️ Doctor tried to join lounge but no hospital was provided.")
 
-@socketio.on('join')
-def on_join(data):
-    room = data.get('hospital') 
-    role = data.get('role')
-    user = data.get('user')
-
-    if room.startswith('cons-') and role == 'Doctor':
-        res = supabase.table("consultations").select("*").eq("session_id", room).execute()
-        
-        # If data is empty, the doctor can't enter
-        if not res.data:
-            print(f"⚠️ Access Denied: {room} not found. Check if row exists in Supabase Dashboard.")
-            emit('error', {'msg': '🛑 Session not found in Database.'})
-            return 
-
-    join_room(room)
-    emit('receive_message', {'user': 'System', 'message': f'{user} has joined.'}, to=room)
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
     patient_name = data.get('patient_name')
     hosp_id = data.get('hospital', 'unknown')
     session_id = data.get('session_id') 
 
-    # 1. YOU MUST INSERT TO DB HERE FIRST
+    # 1. FORCE SAVE TO DATABASE FIRST
     try:
         supabase.table("consultations").insert({
             "session_id": session_id,
             "patient_name": patient_name,
             "hospital_id": hosp_id,
-            "is_paid": True  # Since they clicked the 'Pay' button flow
+            "is_paid": True, # Verification happens here
+            "status": "waiting"
         }).execute()
-        print(f"✅ Session {session_id} saved to Supabase.")
+        print(f"✅ DB Record Created: {session_id}")
     except Exception as e:
         print(f"❌ Supabase Insert Error: {e}")
 
-    # 2. Then notify doctors
+    # 2. ONLY THEN NOTIFY DOCTORS
     lounge_room = f"lounge_{str(hosp_id).lower()}"
     emit('new_patient_waiting', {
         'patient_name': patient_name,
-        'session_id': session_id
+        'session_id': session_id,
+        'hospital': hosp_id
     }, room=lounge_room)
+
+@socketio.on('join')
+def on_join(data):
+    room = data.get('hospital') 
+    role = data.get('role')
+    user = data.get('user')
+
+    # Security check for Doctors
+    if room.startswith('cons-') and role == 'Doctor':
+        res = supabase.table("consultations").select("*").eq("session_id", room).execute()
+        if not res.data:
+            print(f"⚠️ Access Denied: {room} not in DB.")
+            emit('error', {'msg': '🛑 Session not found.'})
+            return 
+
+    join_room(room)
+    emit('receive_message', {'user': 'System', 'message': f'{user} has joined.'}, to=room)
 # --- Inside app.py ---
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
