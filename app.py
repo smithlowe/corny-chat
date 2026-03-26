@@ -106,45 +106,41 @@ def handle_doctor_lounge(data):
 
 @socketio.on('join')
 def on_join(data):
-    room = data.get('hospital')  # This is the session_id
+    room = data.get('hospital') 
     role = data.get('role')
     user = data.get('user')
 
-    # 🛡️ THE SECURITY LOCK
     if room.startswith('cons-') and role == 'Doctor':
-        try:
-            # We use .execute() and check if data exists instead of forcing .single()
-            res = supabase.table("consultations").select("*").eq("session_id", room).execute()
-            
-            if not res.data:
-                print(f"⚠️ Access Denied: Session {room} not found in DB.")
-                emit('error', {'msg': '🛑 Session not found.'})
-                return
+        res = supabase.table("consultations").select("*").eq("session_id", room).execute()
+        
+        # If data is empty, the doctor can't enter
+        if not res.data:
+            print(f"⚠️ Access Denied: {room} not found. Check if row exists in Supabase Dashboard.")
+            emit('error', {'msg': '🛑 Session not found in Database.'})
+            return 
 
-            session_data = res.data[0]
-            is_paid = session_data.get('is_paid') or session_data.get('status') == 'paid'
-            
-            if not is_paid:
-                emit('error', {'msg': '🛑 Payment not verified.'})
-                return 
-        except Exception as e:
-            print(f"❌ Supabase Error: {e}")
-            return
-
-    # If it's a patient or a verified doctor, join the room
     join_room(room)
     emit('receive_message', {'user': 'System', 'message': f'{user} has joined.'}, to=room)
-    print(f"✅ {role} {user} joined private room: {room}")
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
     patient_name = data.get('patient_name')
     hosp_id = data.get('hospital', 'unknown')
     session_id = data.get('session_id') 
 
-    # ✅ THE FIX: Force lowercase so "Mukono" becomes "lounge_mukono"
+    # 1. YOU MUST INSERT TO DB HERE FIRST
+    try:
+        supabase.table("consultations").insert({
+            "session_id": session_id,
+            "patient_name": patient_name,
+            "hospital_id": hosp_id,
+            "is_paid": True  # Since they clicked the 'Pay' button flow
+        }).execute()
+        print(f"✅ Session {session_id} saved to Supabase.")
+    except Exception as e:
+        print(f"❌ Supabase Insert Error: {e}")
+
+    # 2. Then notify doctors
     lounge_room = f"lounge_{str(hosp_id).lower()}"
-    
-    # ... rest of your code ...
     emit('new_patient_waiting', {
         'patient_name': patient_name,
         'session_id': session_id
