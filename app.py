@@ -149,18 +149,17 @@ def handle_patient_waiting(data):
         'patient_name': patient_name,
         'session_id': session_id
     }, room=lounge_room)
+# --- Inside app.py ---
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
     doc_name = data.get('doctor_name')
-    
-    # ... your Supabase update code ...
 
-    # 🚀 This is the critical "Bridge" signal
+    # This MUST match the 'match_found' listener we just added to the HTML
     emit('match_found', {
         'session_id': session_id, 
         'doctor': doc_name
-    }, room=session_id) # ✅ Must match the room the patient just joined
+    }, room=session_id)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')

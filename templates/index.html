@@ -314,6 +314,23 @@ function send() {
             chat.push(data);
             sessionStorage.setItem('session_chat', JSON.stringify(chat));
         });
+        // 👂 This is the Patient's "Ear". It waits for the Doctor's signal.
+socket.on('match_found', function(data) {
+    console.log("✅ Doctor connected! Session ID:", data.session_id);
+    
+    // 1. Remove the Orange Waiting Screen
+    const waitingScreen = document.getElementById('patient-waiting-screen');
+    if (waitingScreen) {
+        waitingScreen.remove();
+    }
+
+    // 2. Show the Chat UI
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+    
+    // 3. Update UI with Doctor's Name
+    alert("Dr. " + data.doctor + " is now online to help you.");
+});
 
         function renderMsg(data) {
             const container = document.getElementById('messages');
