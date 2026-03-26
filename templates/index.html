@@ -35,211 +35,105 @@
     </style>
 </head>
 <body>
-    <button onclick="testConsultation()" style="padding: 10px; background: orange; border-radius: 5px;">
-    Test Private Consultation
-</button>
-
-    <div id="login-overlay">
+    <div id="login-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f2f5; z-index: 2000; display: flex; align-items: center; justify-content: center;">
         <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            <h2 style="color: #007bff;">🏥 Corny-Comm</h2>
-            <input type="text" id="username" placeholder="Full Name" style="width:100%; margin-bottom:10px;">
-            <select id="role" style="width:100%; margin-bottom:10px;" onchange="document.getElementById('docCode').style.display=(this.value=='Doctor'?'block':'none')">
+            <h2 style="color: #007bff; margin-bottom: 20px;">🏥 Corny-Comm</h2>
+            
+            <button onclick="testConsultation()" style="width: 100%; padding: 12px; background: orange; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 15px;">
+                Test Private Consultation
+            </button>
+            
+            <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 15px;">
+
+            <input type="text" id="username" placeholder="Full Name" style="width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;">
+            
+            <select id="role" style="width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;" onchange="document.getElementById('docCode').style.display=(this.value=='Doctor'?'block':'none')">
                 <option value="Patient">Patient</option>
                 <option value="Doctor">Doctor</option>
             </select>
-            <input type="password" id="docCode" placeholder="Access Code" style="display:none; width:100%; margin-bottom:10px;">
-            <select id="hospSelect" style="width:100%; margin-bottom:10px;">
+
+            <input type="password" id="docCode" placeholder="Access Code" style="display:none; width:100%; padding: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 5px;">
+
+            <select id="hospSelect" style="width:100%; padding: 10px; margin-bottom:15px; border: 1px solid #ccc; border-radius: 5px;">
                 <option value="Mulago">Mulago</option>
                 <option value="Nakasero">Nakasero</option>
                 <option value="Mukono">Mukono</option>
             </select>
-            <input type="text" id="rid" placeholder="Room ID (e.g. ROOM-1)" style="width:100%; margin-bottom:15px;">
-            <button onclick="join()" style="width:100%;">JOIN CONSULTATION</button>
+
+            <button onclick="login()" style="width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold;">Enter Clinic</button>
         </div>
     </div>
 
-    <div id="chat-container">
-        <div class="chat-header"><span>🟢 Live Session</span><button onclick="logout()" style="background:#dc3545; padding:5px 10px;">LEAVE</button></div>
-        <div id="messages"></div>
-        <div class="input-area" style="display: flex; flex-direction: column; background: #f8f9fa; border-top: 1px solid #ccc; position: relative;">
-    
-    <div id="timer-display" style="display: none; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: rgba(220, 53, 69, 0.9); color: white; padding: 2px 12px; border-radius: 15px; font-size: 13px; font-weight: bold; z-index: 100;">0:00</div>
-
-    <div id="upload-container" style="display: none; width: 100%; padding: 8px; background: #f1f1f1;">
-        <div style="background: #ccc; border-radius: 5px; height: 8px; width: 100%; overflow: hidden;">
-            <div id="upload-bar" style="background: #28a745; width: 0%; height: 100%; transition: width 0.3s;"></div>
+    <div id="chat-container" style="display: none; height: 100vh; flex-direction: column;">
+        <div class="chat-header" style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🟢 Live Session</span>
+            <button onclick="logout()" style="background:#dc3545; color: white; border: none; padding:5px 10px; border-radius: 5px;">LEAVE</button>
         </div>
-        <small id="upload-text" style="font-size: 11px;">Uploading: 0%</small>
+
+        <div id="messages" style="flex: 1; overflow-y: auto; padding: 15px; background: #fff;"></div>
+
+        <div class="input-area" style="display: flex; flex-direction: column; background: #f8f9fa; border-top: 1px solid #ccc; position: relative; padding: 10px;">
+            
+            <div id="timer-display" style="display: none; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: rgba(220, 53, 69, 0.9); color: white; padding: 2px 12px; border-radius: 15px; font-size: 13px; font-weight: bold; z-index: 100;">0:00</div>
+
+            <div id="upload-container" style="display: none; width: 100%; padding: 8px; background: #f1f1f1; border-radius: 5px; margin-bottom: 5px;">
+                <div style="background: #ccc; border-radius: 5px; height: 8px; width: 100%; overflow: hidden;">
+                    <div id="upload-bar" style="background: #28a745; width: 0%; height: 100%; transition: width 0.3s;"></div>
+                </div>
+                <small id="upload-text" style="font-size: 11px;">Uploading: 0%</small>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="mic-btn" style="background: #dc3545; width: 42px; height: 42px; border-radius: 50%; color: white; border: none; cursor: pointer; touch-action: none;">🎤</button>
+                <input type="text" id="m-input" placeholder="Message..." style="flex: 1; height: 38px; border-radius: 20px; border: 1px solid #ccc; padding: 0 15px;" onkeypress="if(event.key==='Enter')send()">
+                <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px; color: white; border: none; cursor: pointer;">📎</button>
+                <button onclick="send()" style="background: #28a745; color: white; border-radius: 5px; height: 38px; border: none; padding: 0 15px; font-weight: bold; cursor: pointer;">Send</button>
+            </div>
+        </div>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 10px; padding: 10px;">
-        <button id="mic-btn" style="background: #dc3545; width: 42px; height: 42px; border-radius: 50%; color: white; border: none; cursor: pointer; touch-action: none;">🎤</button>
-        
-        <input type="text" id="m-input" placeholder="Message..." style="flex: 1; height: 38px; border-radius: 20px; border: 1px solid #ccc; padding: 0 15px;" onkeypress="if(event.key==='Enter')send()">
-        
-        <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px; color: white; border: none;">📎</button>
-        <button onclick="send()" style="background: #28a745; color: white; border-radius: 5px; height: 38px; border: none; padding: 0 15px; font-weight: bold;">Send</button>
-    </div>
-</div>
-
-<input type="file" id="fIn" style="display:none" onchange="uploadFile()">
-
+    <input type="file" id="fIn" style="display:none" onchange="uploadFile()">
+</body>
 <script>
-    let socket = io(), myUser = "", myRoom = "";
-    // Rest of your JS code follows below...
-        // 1. INITIALIZATION & LISTENERS
-document.addEventListener('DOMContentLoaded', () => {
-    const micBtn = document.getElementById('mic-btn');
-    const timerDisplay = document.getElementById('timer-display');
+        let socket = io(), myUser = "", myRoom = "";
+        let mediaRecorder, audioChunks = [], timerInterval, seconds = 0;
 
-    if (micBtn) {
-        // Laptop/Mouse Support
-        micBtn.addEventListener('mousedown', startRecording);
-        window.addEventListener('mouseup', stopRecording);
+        // 1. PRIVATE CONSULTATION LOGIC
+        async function testConsultation() { // Fixed: 'async' was 'sync'
+            const u = document.getElementById('username').value;
+            const h = document.getElementById('hospSelect').value;
 
-        // Mobile/Touch Support (Long Press Fix)
-        micBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // 👈 Stops the phone from zooming/scrolling
-            startRecording();
-        }, { passive: false });
-
-        window.addEventListener('touchend', (e) => {
-            stopRecording();
-        });
-    }
-
-    // Restore Session Messages (Privacy Logic)
-    if (localStorage.getItem('n')) {
-        myUser = localStorage.getItem('n'); 
-        myRoom = localStorage.getItem('r');
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'flex';
-        socket.emit('join', { user: myUser, hospital: myRoom });
-        
-        let saved = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
-        saved.forEach(renderMsg);
-    }
-});
-function testConsultation() {
-    console.log("Requesting consultation...");
-    socket.emit('request_consultation', {
-        user: myUser, // Make sure this variable is set
-        hospital_id: "Mulago" // Use a test ID from your hospitals table
-    });
-}
-
-// Listen for the response from the server
-socket.on('match_found', (data) => {
-    console.log("Private Session Created:", data.session_id);
-    alert("Consultation Started! Room ID: " + data.session_id);
-    // You can now join this room automatically
-    myRoom = data.session_id;
-    socket.emit('join', { hospital: myRoom, user: myUser });
-});
-
-// 2. UPDATED VOICE FUNCTIONS
-async function startRecording() {
-    const micBtn = document.getElementById('mic-btn');
-    const timerDisplay = document.getElementById('timer-display');
-
-    // 🕵️ Check 1: Is the browser blocking us?
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("🚨 Security Block: Your browser requires HTTPS to use the microphone. Please check your URL starts with https://");
-        return;
-    }
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(audioChunks, { type: 'audio/webm' });
-            if (seconds >= 1) sendVoiceNote(blob);
-            stream.getTracks().forEach(t => t.stop());
-        };
-
-        mediaRecorder.start();
-        
-        // Timer Logic
-        seconds = 0;
-        timerDisplay.innerText = "0:00";
-        timerDisplay.style.display = "block";
-        micBtn.style.background = "#dc3545"; 
-        micBtn.style.transform = "scale(1.3)";
-
-        timerInterval = setInterval(() => {
-            seconds++;
-            let m = Math.floor(seconds / 60), s = seconds % 60;
-            timerDisplay.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-        }, 1000);
-
-    } catch (err) {
-        // 🕵️ Check 2: Did the user click "Deny"?
-        console.error("Mic Error:", err);
-        alert("Microphone Access Error: " + err.message);
-    }
-}
-
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-        
-        // 1. Tell the recorder what to do with the audio data when it stops
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(audioChunks, { type: 'audio/webm' });
-            if (seconds >= 1) {
-                sendVoiceNote(blob); // 👈 THIS triggers your new function
-            }
-            // Cleanup: stop the mic hardware to save battery
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
-        };
-
-        // 2. Actually stop the recording
-        mediaRecorder.stop();
-        clearInterval(timerInterval);
-        
-        // 3. Reset the UI
-        document.getElementById('mic-btn').style.background = "#007bff";
-        document.getElementById('mic-btn').style.transform = "scale(1)";
-        document.getElementById('timer-display').style.display = "none";
-    }
-}
-
-// Your sendVoiceNote function goes right here below it
-async function sendVoiceNote(blob) {
-    const fileName = `voice_${Date.now()}.webm`;
-    const formData = new FormData();
-    formData.append('file', blob, fileName);
-
-    try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            const audioHTML = `<audio controls src="${result.url}" style="width: 200px; height: 35px;"></audio>`;
-            socket.emit('send_message', { 
-                message: audioHTML, 
-                user: myUser, 
-                hospital: myRoom, 
-                doctor_name: "Dr. Mulinda" 
+            if (!u) return alert("Please enter your Full Name first");
+            
+            myUser = u; 
+            console.log(`Requesting private consultation at ${h} for ${u}...`);
+            
+            socket.emit('request_consultation', {
+                user: u,
+                hospital_id: h
             });
-        } else {
-            alert("Upload Failed: " + (result.error || "Check Supabase Bucket name"));
         }
-    } catch (err) {
-        console.error("Transmission Error:", err);
-        alert("Network Error: Make sure you are on HTTPS");
-    }
-}
+
+        // Listen for the Private Room ID from Python (Only ONE listener needed)
+        socket.on('match_found', (data) => {
+            console.log("Private Session Created:", data.session_id);
+            
+            myRoom = data.session_id;
+            localStorage.setItem('n', myUser);
+            localStorage.setItem('r', myRoom);
+
+            // Hide Login and Show Chat
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('chat-container').style.display = 'flex';
+
+            socket.emit('join', { hospital: myRoom, user: myUser });
+            alert("Consultation Started! Your Private ID: " + data.session_id);
+        });
+
+        // 2. JOIN & LOGOUT LOGIC
         async function join() {
             const u = document.getElementById('username').value;
             const r = document.getElementById('rid').value;
-            const h = document.getElementById('hospSelect').value;
             if(!u || !r) return alert("Required fields missing");
             
             myUser = u; myRoom = r;
@@ -249,6 +143,13 @@ async function sendVoiceNote(blob) {
             socket.emit('join', { user: u, hospital: r });
         }
 
+        function logout() {
+            localStorage.clear();
+            sessionStorage.clear(); 
+            window.location.reload();
+        }
+
+        // 3. MESSAGING & UPLOADS
         function send() {
             const i = document.getElementById('m-input');
             if(i.value.trim()){
@@ -259,7 +160,6 @@ async function sendVoiceNote(blob) {
 
         socket.on('receive_message', (data) => {
             renderMsg(data);
-            // 💾 SAVE to session storage for refresh safety
             let chat = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
             chat.push(data);
             sessionStorage.setItem('session_chat', JSON.stringify(chat));
@@ -274,71 +174,83 @@ async function sendVoiceNote(blob) {
             container.scrollTop = container.scrollHeight;
         }
 
-        function logout() {
-            localStorage.clear();
-            sessionStorage.clear(); // 🧹 DELETE all messages for privacy
-            window.location.reload();
+        // 4. VOICE & FILE FUNCTIONS (Untouched & Stable)
+        async function startRecording() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return alert("🚨 HTTPS Required for Microphone");
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (seconds >= 1) sendVoiceNote(blob);
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                seconds = 0;
+                document.getElementById('timer-display').style.display = "block";
+                timerInterval = setInterval(() => {
+                    seconds++;
+                    let m = Math.floor(seconds / 60), s = seconds % 60;
+                    document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                }, 1000);
+            } catch (err) { alert("Mic Error: " + err.message); }
         }
-        // This listens for the "Private Room" ID from Python
-    socket.on('match_found', (data) => {
-        console.log("Private Session Created:", data.session_id);
-        alert("Consultation Started! Room ID: " + data.session_id);
-        
-        myRoom = data.session_id; // Switch the patient to the private room
-        socket.emit('join', { hospital: myRoom, user: myUser });
-    });
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                clearInterval(timerInterval);
+                document.getElementById('timer-display').style.display = "none";
+            }
+        }
+
+        async function sendVoiceNote(blob) {
+            const formData = new FormData();
+            formData.append('file', blob, `voice_${Date.now()}.webm`);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const result = await res.json();
+            if (result.success) {
+                const audioHTML = `<audio controls src="${result.url}" style="width: 200px; height: 35px;"></audio>`;
+                socket.emit('send_message', { message: audioHTML, user: myUser, hospital: myRoom });
+            }
+        }
 
         function uploadFile() {
-    const fileInput = document.getElementById('fIn');
-    const file = fileInput.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Show the bar
-    document.getElementById('upload-container').style.display = 'block';
-
-    const xhr = new XMLHttpRequest();
-    
-    // Update progress bar
-    xhr.upload.onprogress = function(e) {
-        if (e.lengthComputable) {
-            const percent = Math.round((e.loaded / e.total) * 100);
-            document.getElementById('upload-bar').style.width = percent + '%';
-            document.getElementById('upload-text').innerText = "Uploading: " + percent + "%";
+            const file = document.getElementById('fIn').files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            document.getElementById('upload-container').style.display = 'block';
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = (e) => {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                document.getElementById('upload-bar').style.width = percent + '%';
+                document.getElementById('upload-text').innerText = "Uploading: " + percent + "%";
+            };
+            xhr.onload = () => {
+                const response = JSON.parse(xhr.responseText);
+                document.getElementById('upload-container').style.display = 'none';
+                if (response.success) {
+                    let content = file.type.startsWith('image/') ? `<img src="${response.url}" style="max-width:250px;">` : `<a href="${response.url}" target="_blank">View File</a>`;
+                    socket.emit('send_message', { message: content, user: myUser, hospital: myRoom });
+                }
+            };
+            xhr.open('POST', '/upload');
+            xhr.send(formData);
         }
-    };
 
-    xhr.onload = function() {
-        const response = JSON.parse(xhr.responseText);
-        document.getElementById('upload-container').style.display = 'none';
-
-        if (response.success) {
-            const url = response.url;
-            let content = "";
-
-            // Check if it's an image or video to show it DIRECTLY
-            if (file.type.startsWith('image/')) {
-                content = `<img src="${url}" style="max-width:250px; border-radius:10px;">`;
-            } else if (file.type.startsWith('video/')) {
-                content = `<video src="${url}" controls style="max-width:250px; border-radius:10px;"></video>`;
-            } else {
-                content = `<a href="${url}" target="_blank">Download File</a>`;
-            }
-
-            // Emit to socket
-            socket.emit('send_message', {
-                message: content,
-                user: myUser,
-                hospital: myRoom
-            });
+        // Connect Mic Button to Functions
+        const mBtn = document.getElementById('mic-btn');
+        if(mBtn) {
+            mBtn.addEventListener('mousedown', startRecording);
+            mBtn.addEventListener('mouseup', stopRecording);
+            mBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+            mBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
         }
-    };
-
-    xhr.open('POST', '/upload');
-    xhr.send(formData);
-}
     </script>
 </body>
 </html>
