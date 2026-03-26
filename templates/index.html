@@ -124,15 +124,14 @@
     alert("Dr. " + data.doctor + " is ready to assist you.");
 });
 socket.on('remove_patient_from_list', function(data) {
-    console.log("🚫 Removing claimed patient: " + data.session_id);
+    console.log("🚫 Removing all instances of claimed patient: " + data.session_id);
     
-    // Find the specific patient element by its ID or a data attribute
-    // Assuming your list items have an ID like "req-cons-abc123"
-    const patientRow = document.getElementById('req-' + data.session_id);
+    // Select ALL elements that have the class 'req-' + session_id
+    const patientElements = document.querySelectorAll('.req-' + data.session_id);
     
-    if (patientRow) {
-        patientRow.remove();
-    }
+    patientElements.forEach(element => {
+        element.remove();
+    });
 });
         // 🟠 PATIENT FLOW: Triggered by Orange Button
 function startPatientFlow() {
@@ -181,16 +180,19 @@ function startDoctorFlow() {
 // A. When a patient pays, this shows the request to ALL doctors in that hospital
 socket.on('new_patient_waiting', function(data) {
     const list = document.getElementById('waiting-list');
-    
-    // Notice the id="req-${data.session_id}" below. 
-    // This is the "handle" that allows the remove function to find it!
+    const notificationArea = document.getElementById('notifications'); // Or wherever your 2nd button is
+
+    // Use a CLASS instead of an ID here
     const item = `
-        <div id="req-${data.session_id}" class="patient-card">
-            <p><strong>Patient:</strong> ${data.patient_name}</p>
+        <div class="req-${data.session_id} patient-card">
+            <p><strong>New Patient:</strong> ${data.patient_name}</p>
             <button onclick="acceptPatient('${data.session_id}')">Accept</button>
         </div>
     `;
-    list.insertAdjacentHTML('beforeend', item);
+
+    // Add it to both places if necessary
+    if(list) list.insertAdjacentHTML('beforeend', item);
+    if(notificationArea) notificationArea.insertAdjacentHTML('beforeend', item);
 });
 
 // B. When the doctor clicks ACCEPT
