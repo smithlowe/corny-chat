@@ -249,30 +249,24 @@ function testConsultation() {
 // 👂 PATIENT LISTENER: This waits for the Doctor to click "Accept"
 // 👂 FINAL PATIENT LISTENER: Moves patient from "Waiting" to "Chat"
 socket.on('match_found', (data) => {
-    myRoom = data.session_id;
-    console.log("✅ Match found! Room:", myRoom);
+    myRoom = data.session_id; // Set the global room ID
+    console.log("✅ Match found! Joining Room:", myRoom);
     
-    // 1. Remove the orange "Waiting" screen
+    // 1. Clear the waiting screen
     const waitingScreen = document.getElementById('patient-waiting-screen');
-    if (waitingScreen) {
-        waitingScreen.remove();
-        console.log("Waiting screen removed.");
-    }
+    if (waitingScreen) waitingScreen.remove();
 
-    // 2. Show the chat container
-    const chatContainer = document.getElementById('chat-container');
-    if (chatContainer) {
-        chatContainer.style.display = 'flex';
-    }
+    // 2. Open the Chat UI
+    document.getElementById('chat-container').style.display = 'flex';
     
-    // 3. Update the header with the Doctor's name
-    // Note: Since you don't have a specific span for this yet, we can update the "Live Session" text
+    // 3. Show the Doctor's name in the header
     const headerTitle = document.querySelector('.chat-header span');
-    if (headerTitle) {
-        headerTitle.innerHTML = `🟢 Live: ${data.doctor}`;
-    }
+    if (headerTitle) headerTitle.innerHTML = `🟢 consulting with ${data.doctor}`;
 
-    alert(`👨‍⚕️ ${data.doctor} has joined! You can now start the consultation.`);
+    // 🚀 THE FIX: Patient must join the same room the doctor just joined
+    socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
+    
+    alert(`👨‍⚕️ ${data.doctor} is ready. You can now type your symptoms.`);
 });
 function enterClinic() {
     const docName = document.getElementById('username').value;
@@ -318,18 +312,7 @@ function acceptPatient(sid) {
 // --- PATIENT LOGIC ---
 
         // 2. JOIN & LOGOUT LOGIC
-        async function join() {
-            const u = document.getElementById('username').value;
-            const r = document.getElementById('rid').value;
-            if(!u || !r) return alert("Required fields missing");
-            
-            myUser = u; myRoom = r;
-            localStorage.setItem('n', u); localStorage.setItem('r', r);
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('chat-container').style.display = 'flex';
-            socket.emit('join', { user: u, hospital: r });
-        }
-
+        
         function logout() {
             localStorage.clear();
             sessionStorage.clear(); 
@@ -337,13 +320,30 @@ function acceptPatient(sid) {
         }
 
         // 3. MESSAGING & UPLOADS
-        function send() {
-            const i = document.getElementById('m-input');
-            if(i.value.trim()){
-                socket.emit('send_message', { message: i.value, user: myUser, hospital: myRoom, doctor_name: "Dr. Mulinda" });
-                i.value = "";
-            }
+        // --- 3. MESSAGING & UPLOADS ---
+
+function send() {
+    const i = document.getElementById('m-input');
+    
+    // Check if the input isn't empty and we are actually in a room
+    if (i.value.trim()) {
+        if (!myRoom) {
+            return alert("⚠️ You are not connected to a consultation room yet.");
         }
+
+        console.log("📤 Sending message to room:", myRoom);
+
+        // 🚀 THE FIX: We MUST send 'hospital: myRoom' so the server 
+        // knows which specific patient/doctor should receive this.
+        socket.emit('send_message', { 
+            message: i.value, 
+            user: myUser, 
+            hospital: myRoom 
+        });
+
+        i.value = ""; // Clear input box
+    }
+}
 
         socket.on('receive_message', (data) => {
             renderMsg(data);
