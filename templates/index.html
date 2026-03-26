@@ -210,7 +210,7 @@ function testConsultation() {
     myUser = name;
     myRoom = session_id;
 
-    // 1. First, tell the server to create the session in Supabase
+    // 1. Tell the server to save the session to Supabase
     socket.emit('patient_paid_and_waiting', { 
         patient_name: name, 
         hospital: hosp,
@@ -218,15 +218,28 @@ function testConsultation() {
         session_id: session_id 
     });
 
-    // 2. ⏳ WAIT 1.5 SECONDS for the DB to save, then join
+    // 2. ⏳ WAIT 1.5 SECONDS before joining the room
     setTimeout(() => {
         console.log("⏱️ Delay over, joining room now...");
         socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
-    }, 1500); 
+    }, 1500);
 
-    // 3. Show the waiting UI immediately
+    // 3. 🎨 SHOW THE WAITING UI IMMEDIATELY
     document.getElementById('login-overlay').style.display = 'none';
-    showWaitingScreen(name, hosp); // Use your existing UI code here
+    
+    const waitingArea = document.createElement('div');
+    waitingArea.id = "patient-waiting-screen";
+    waitingArea.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:3000;";
+    waitingArea.innerHTML = `
+        <div style="text-align:center; padding:30px; font-family:sans-serif; border: 2px solid orange; border-radius: 15px;">
+            <h2 style="color: orange;">⏳ Payment Verified!</h2>
+            <p>Hello <strong>${name}</strong>, notifying doctors at <strong>${hosp}</strong>.</p>
+            <div class="loader-spinner" style="margin: 20px auto; border: 4px solid #f3f3f3; border-top: 4px solid orange; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite;"></div>
+            <p style="color: #666;">A doctor will join you shortly. Do not close this page.</p>
+        </div>
+        <style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
+    `;
+    document.body.appendChild(waitingArea);
 }
 function enterClinic() {
     const docName = document.getElementById('username').value;
