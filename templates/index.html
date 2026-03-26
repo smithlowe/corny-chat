@@ -124,11 +124,11 @@
     alert("Dr. " + data.doctor + " is ready to assist you.");
 });
 socket.on('remove_patient_from_list', function(data) {
-    // Find EVERY element with that specific class
-    const elements = document.querySelectorAll('.req-' + data.session_id);
+    // Select ALL wrappers with that session class
+    const wrappers = document.querySelectorAll('.req-' + data.session_id);
     
-    elements.forEach(el => {
-        el.remove(); // Delete every single one found
+    wrappers.forEach(container => {
+        container.remove(); // This deletes the div AND everything inside it (both buttons)
     });
 });
         // 🟠 PATIENT FLOW: Triggered by Orange Button
@@ -179,11 +179,14 @@ function startDoctorFlow() {
 socket.on('new_patient_waiting', function(data) {
     const list = document.getElementById('waiting-list');
     
-    // THE NEW TEMPLATE (Using Class instead of ID)
+    // THE WRAPPER DIV is what we will delete later
     const item = `
         <div class="req-${data.session_id} patient-card">
             <p><strong>New Patient:</strong> ${data.patient_name}</p>
-            <button onclick="acceptPatient('${data.session_id}')">Accept</button>
+            
+            <button onclick="acceptPatient('${data.session_id}')">ACCEPT</button>
+            
+            <button onclick="acceptPatient('${data.session_id}')">ACCEPT AND CHAT</button>
         </div>
     `;
 
