@@ -124,13 +124,11 @@
     alert("Dr. " + data.doctor + " is ready to assist you.");
 });
 socket.on('remove_patient_from_list', function(data) {
-    console.log("🚫 Removing all instances of claimed patient: " + data.session_id);
+    // Find EVERY element with that specific class
+    const elements = document.querySelectorAll('.req-' + data.session_id);
     
-    // Select ALL elements that have the class 'req-' + session_id
-    const patientElements = document.querySelectorAll('.req-' + data.session_id);
-    
-    patientElements.forEach(element => {
-        element.remove();
+    elements.forEach(el => {
+        el.remove(); // Delete every single one found
     });
 });
         // 🟠 PATIENT FLOW: Triggered by Orange Button
@@ -180,9 +178,8 @@ function startDoctorFlow() {
 // A. When a patient pays, this shows the request to ALL doctors in that hospital
 socket.on('new_patient_waiting', function(data) {
     const list = document.getElementById('waiting-list');
-    const notificationArea = document.getElementById('notifications'); // Or wherever your 2nd button is
-
-    // Use a CLASS instead of an ID here
+    
+    // THE NEW TEMPLATE (Using Class instead of ID)
     const item = `
         <div class="req-${data.session_id} patient-card">
             <p><strong>New Patient:</strong> ${data.patient_name}</p>
@@ -190,9 +187,9 @@ socket.on('new_patient_waiting', function(data) {
         </div>
     `;
 
-    // Add it to both places if necessary
-    if(list) list.insertAdjacentHTML('beforeend', item);
-    if(notificationArea) notificationArea.insertAdjacentHTML('beforeend', item);
+    if (list) {
+        list.insertAdjacentHTML('beforeend', item);
+    }
 });
 
 // B. When the doctor clicks ACCEPT
