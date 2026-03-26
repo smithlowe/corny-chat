@@ -48,6 +48,27 @@ def on_join(data):
         join_room(room)
         # 🔒 PRIVACY: No history fetch here. New joins start with a clean screen.
         print(f"User joined active session: {room}")
+        @socketio.on('request_consultation')
+def handle_request(data):
+    patient = data.get('user')
+    hospital = data.get('hospital_id')
+    
+    # Create a unique private room ID
+    session_id = f"cons-{uuid.uuid4().hex[:8]}" 
+    
+    # Store this request in Supabase so doctors can see it
+    supabase.table("consultations").insert({
+        "session_id": session_id,
+        "patient_name": patient,
+        "hospital_id": hospital,
+        "status": "pending"
+    }).execute()
+    
+    # Tell the patient to join this private room
+    emit('match_found', {'session_id': session_id})
+    
+    # Notify all online doctors at that hospital
+    emit('new_consultation_request', {'patient': patient, 'session_id': session_id}, to=hospital)
 
 @socketio.on('send_message')
 def handle_message(data):
