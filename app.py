@@ -155,11 +155,19 @@ def handle_acceptance(data):
     session_id = data.get('session_id')
     doc_name = data.get('doctor_name')
 
-    # This MUST match the 'match_found' listener we just added to the HTML
+    # Update status in Supabase so the lock is opened
+    supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
+
+    # BROADCAST to the specific session room
+    # This triggers the 'match_found' listener on the patient's side
     emit('match_found', {
         'session_id': session_id, 
         'doctor': doc_name
-    }, room=session_id)
+    }, room=session_id) 
+    
+    # Optional: Tell other doctors to remove this patient from their list
+    lounge_room = f"lounge_{data.get('hospital', '').lower()}"
+    emit('remove_apatient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')
