@@ -155,11 +155,10 @@ def handle_acceptance(data):
     doc_name = data.get('doctor_name')
     hosp = data.get('hospital', 'unknown')
 
-    # 1. Update DB
-    supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
+    # 1. Update status in Supabase so the security 'join' check passes
+    supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
 
-    # 2. TRIGGER THE PATIENT'S UI CHANGE
-    # We send 'match_found' to the specific session_id room
+    # 2. TRIGGER THE PATIENT'S UI CHANGE (This is what removes the waiting screen)
     emit('match_found', {
         'session_id': session_id, 
         'doctor': doc_name
@@ -167,7 +166,7 @@ def handle_acceptance(data):
 
     # 3. Clean up the lounge for other doctors
     lounge_room = f"lounge_{str(hosp).lower()}"
-    emit('remove_apatient_from_list', {'session_id': session_id}, room=lounge_room, broadcast=True)
+    emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, broadcast=True)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')

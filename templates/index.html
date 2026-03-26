@@ -110,20 +110,18 @@
         socket.on('match_found', function(data) {
     console.log("✅ Match found! Removing waiting screen...");
     
-    // Remove the orange waiting screen
+    // 1. Remove the orange "Notifying Doctors" overlay
     const waitingScreen = document.getElementById('patient-waiting-screen');
     if (waitingScreen) {
-        waitingScreen.remove();
+        waitingScreen.style.display = 'none'; // or waitingScreen.remove();
     }
 
-    // Show the chat
+    // 2. Open the chat UI
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('chat-container').style.display = 'flex';
     
-    // Set the global room variable so messages go to the right place
     myRoom = data.session_id;
-    
-    alert("Dr. " + data.doctor + " has joined the session.");
+    alert("Dr. " + data.doctor + " is ready to assist you.");
 });
         // 🟠 PATIENT FLOW: Triggered by Orange Button
 function startPatientFlow() {
@@ -285,12 +283,20 @@ socket.on('new_patient_waiting', (data) => {
 });
 
 function acceptPatient(sid) {
-    myRoom = sid; // Set the room to the unique session ID
-    
-    // 3. Move doctor into the private chat room
-    // FIXED: Added 'user: myUser' so the backend knows who is joining
+    const hosp = document.getElementById('hospSelect').value;
+    myRoom = sid; 
+
+    // Tell the server this doctor is taking the case
+    socket.emit('doctor_accepted_patient', { 
+        session_id: sid, 
+        doctor_name: myUser,
+        hospital: hosp 
+    });
+
+    // The doctor joins the patient's private room
     socket.emit('join', { hospital: sid, user: myUser, role: 'Doctor' });
-    
+
+    // Switch Doctor UI
     document.getElementById('doctor-dashboard').style.display = 'none';
     document.getElementById('chat-container').style.display = 'flex';
 }
