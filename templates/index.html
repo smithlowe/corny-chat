@@ -35,6 +35,9 @@
     </style>
 </head>
 <body>
+    <button onclick="testConsultation()" style="padding: 10px; background: orange; border-radius: 5px;">
+    Test Private Consultation
+</button>
 
     <div id="login-overlay">
         <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -116,6 +119,22 @@ document.addEventListener('DOMContentLoaded', () => {
         let saved = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
         saved.forEach(renderMsg);
     }
+});
+function testConsultation() {
+    console.log("Requesting consultation...");
+    socket.emit('request_consultation', {
+        user: myUser, // Make sure this variable is set
+        hospital_id: "Mulago" // Use a test ID from your hospitals table
+    });
+}
+
+// Listen for the response from the server
+socket.on('match_found', (data) => {
+    console.log("Private Session Created:", data.session_id);
+    alert("Consultation Started! Room ID: " + data.session_id);
+    // You can now join this room automatically
+    myRoom = data.session_id;
+    socket.emit('join', { hospital: myRoom, user: myUser });
 });
 
 // 2. UPDATED VOICE FUNCTIONS
@@ -260,6 +279,14 @@ async function sendVoiceNote(blob) {
             sessionStorage.clear(); // 🧹 DELETE all messages for privacy
             window.location.reload();
         }
+        // This listens for the "Private Room" ID from Python
+    socket.on('match_found', (data) => {
+        console.log("Private Session Created:", data.session_id);
+        alert("Consultation Started! Room ID: " + data.session_id);
+        
+        myRoom = data.session_id; // Switch the patient to the private room
+        socket.emit('join', { hospital: myRoom, user: myUser });
+    });
 
         function uploadFile() {
     const fileInput = document.getElementById('fIn');
