@@ -59,13 +59,19 @@
         <div class="chat-header"><span>🟢 Live Session</span><button onclick="logout()" style="background:#dc3545; padding:5px 10px;">LEAVE</button></div>
         <div id="messages"></div>
         <div class="input-area">
-            <button id="mic-btn" style="border-radius: 50%; width: 45px; height: 45px;">🎤</button>
-            <input type="text" id="m-input" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
-            <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px;">📎</button>
-            <button onclick="send()">Send</button>
-        </div>
-        <input type="file" id="fIn" style="display:none" onchange="uploadFile()">
+    <div style="position: relative; width: 50px; display: flex; justify-content: center;">
+        <div id="timer-display" style="display: none;">0:00</div> 
+        
+        <button id="mic-btn" style="background: #007bff; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; touch-action: none;">
+            🎤
+        </button>
     </div>
+
+    <input type="text" id="m-input" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
+    <button onclick="document.getElementById('fIn').click()" style="background:#6c757d; border-radius: 50%; width: 35px; height: 35px; color: white;">📎</button>
+    <button onclick="send()">Send</button>
+</div>
+<input type="file" id="fIn" style="display:none" onchange="uploadFile()">
 
     <script>
         let socket = io(), myUser = "", myRoom = "";
