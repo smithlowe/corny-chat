@@ -86,14 +86,29 @@ def handle_request(data):
         'hospital': hospital
     })
 @socketio.on('test_payment_success')
-def test_payment(data):
+def handle_payment_master(data):
     session_id = data.get('session_id')
     
-    # Update Supabase to "Unlock" the room
+    # 1. UNLOCK: Update Supabase so the Doctor can eventually enter
     supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
     
-    # Tell the frontend the payment is verified
-    emit('match_found', {'session_id': session_id}, room=request.sid)
+    # 2. GET DATA: Fetch the patient's name and hospital ID
+    res = supabase.table("consultations").select("*").eq("session_id", session_id).single().execute()
+    patient_data = res.data
+    
+    if patient_data:
+        # 3. ALERT PATIENT: Tell the patient's browser to show the "Waiting" screen
+        emit('match_found', {'session_id': session_id}, room=request.sid)
+
+        # 4. PING DOCTORS: Notify all doctors in that specific hospital's lounge
+        hospital_lounge = f"lounge_{patient_data['hospital_id']}"
+        emit('new_patient_waiting', {
+            'patient_name': patient_data['patient_name'],
+            'session_id': session_id,
+            'hospital': patient_data['hospital_id']
+        }, room=hospital_lounge)
+        
+        print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
 @socketio.on('join')
 def on_join(data):
     room = data.get('hospital')

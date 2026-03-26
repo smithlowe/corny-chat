@@ -137,19 +137,64 @@ socket.on('payment_prompt', (data) => {
 });
 
 // 3. UPDATED: Only join after Payment is Successful
+// --- DOCTOR LOGIC ---
+
+function enterClinic() {
+    const docName = document.getElementById('username').value;
+    const hosp = document.getElementById('hospSelect').value;
+    
+    if (!docName) return alert("Please enter your name first");
+
+    myUser = docName; // Save the doctor's name globally
+    
+    // 1. Join the "Lounge" (The Green Button path)
+    socket.emit('join_lounge', { doctor: docName, hospital: hosp });
+    
+    // 2. Switch UI
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('doctor-dashboard').style.display = 'block';
+}
+
+socket.on('new_patient_waiting', (data) => {
+    const list = document.getElementById('waiting-list');
+    // We use a template literal to build the "Accept" box
+    const patientRow = `
+        <div id="row-${data.session_id}" style="border: 1px solid #28a745; padding: 10px; margin-bottom: 5px; border-radius: 5px;">
+            <p><strong>Patient:</strong> ${data.patient_name}</p>
+            <button onclick="acceptPatient('${data.session_id}')" style="background:#28a745; color:white; border:none; padding:5px; cursor:pointer;">
+                Accept & Start Chat
+            </button>
+        </div>
+    `;
+    list.innerHTML = patientRow + list.innerHTML; // Put new patients at the top
+});
+
+function acceptPatient(sid) {
+    myRoom = sid; // Set the room to the unique session ID
+    
+    // 3. Move doctor into the private chat room
+    // FIXED: Added 'user: myUser' so the backend knows who is joining
+    socket.emit('join', { hospital: sid, user: myUser, role: 'Doctor' });
+    
+    document.getElementById('doctor-dashboard').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+}
+
+// --- PATIENT LOGIC ---
+
 socket.on('match_found', (data) => {
     myRoom = data.session_id;
     localStorage.setItem('n', myUser);
     localStorage.setItem('r', myRoom);
 
-    // Only NOW do we hide the login screen
+    // Only NOW do we hide the login screen for the patient
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('chat-container').style.display = 'flex';
 
+    // 4. Move patient into the private chat room
     socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
     alert("✅ Payment Verified! Room ID: " + data.session_id);
 });
-
         // 2. JOIN & LOGOUT LOGIC
         async function join() {
             const u = document.getElementById('username').value;
