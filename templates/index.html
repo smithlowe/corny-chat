@@ -203,24 +203,22 @@ function testConsultation() {
 
     if (!name) return alert("Please enter your name first!");
 
-    // 1. 📱 10-DIGIT VERIFICATION (REMAINS STRICT)
+    // 1. Get Phone Number
     let phone = prompt(`🏥 Hospital: ${hosp}\n💰 Consultation Fee: 5,000 UGX\n\nEnter 10-digit Mobile Money Number:`);
 
     if (!phone || !/^\d{10}$/.test(phone)) {
-        return alert("❌ Invalid number! Please enter exactly 10 digits (e.g., 0770123456).");
+        return alert("❌ Invalid number! Please enter exactly 10 digits.");
     }
 
-    // 2. 🔑 GENERATE SESSION ID BEFORE EMITTING
-    // This ensures the patient and doctor have the same "Room Address"
+    // 2. 🔑 GENERATE SESSION & JOIN IMMEDIATELY (The Fix)
     const session_id = "cons-" + Math.random().toString(36).substr(2, 9);
     myUser = name;
-    myRoom = session_id; // Store globally so other functions can use it
+    myRoom = session_id; 
 
-    // 3. 📢 JOIN THE PRIVATE ROOM IMMEDIATELY
-    // This is the "Ear" that listens for the doctor's acceptance
+    // ✅ THIS IS THE KEY: Join the room BEFORE the waiting screen starts
     socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
 
-    // 4. 🚀 NOTIFY THE DOCTORS (Now includes the session_id)
+    // 3. 🚀 NOTIFY THE DOCTORS
     socket.emit('patient_paid_and_waiting', { 
         patient_name: name, 
         hospital: hosp,
@@ -228,7 +226,7 @@ function testConsultation() {
         session_id: session_id 
     });
 
-    // 5. ⏳ SHOW THE WAITING SCREEN (EXISTING UI)
+    // 4. ⏳ SHOW THE WAITING SCREEN
     document.getElementById('login-overlay').style.display = 'none';
     const waitingArea = document.createElement('div');
     waitingArea.id = "patient-waiting-screen";
@@ -240,35 +238,9 @@ function testConsultation() {
             <div class="loader-spinner"></div>
             <p style="color: #666;">A doctor will join you shortly. Do not close this page.</p>
         </div>
-        <style>
-            .loader-spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid orange; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        </style>
     `;
     document.body.appendChild(waitingArea);
 }
-// 👂 PATIENT LISTENER: This waits for the Doctor to click "Accept"
-// 👂 FINAL PATIENT LISTENER: Moves patient from "Waiting" to "Chat"
-socket.on('match_found', (data) => {
-    myRoom = data.session_id; // Set the global room ID
-    console.log("✅ Match found! Joining Room:", myRoom);
-    
-    // 1. Clear the waiting screen
-    const waitingScreen = document.getElementById('patient-waiting-screen');
-    if (waitingScreen) waitingScreen.remove();
-
-    // 2. Open the Chat UI
-    document.getElementById('chat-container').style.display = 'flex';
-    
-    // 3. Show the Doctor's name in the header
-    const headerTitle = document.querySelector('.chat-header span');
-    if (headerTitle) headerTitle.innerHTML = `🟢 consulting with ${data.doctor}`;
-
-    // 🚀 THE FIX: Patient must join the same room the doctor just joined
-    socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
-    
-    alert(`👨‍⚕️ ${data.doctor} is ready. You can now type your symptoms.`);
-});
 function enterClinic() {
     const docName = document.getElementById('username').value;
     const hosp = document.getElementById('hospSelect').value;
