@@ -85,6 +85,15 @@ def handle_request(data):
         'fee': 5000,
         'hospital': hospital
     })
+@socketio.on('test_payment_success')
+def test_payment(data):
+    session_id = data.get('session_id')
+    
+    # Update Supabase to "Unlock" the room
+    supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
+    
+    # Tell the frontend the payment is verified
+    emit('match_found', {'session_id': session_id}, room=request.sid)
 @socketio.on('join')
 def on_join(data):
     room = data.get('hospital')
