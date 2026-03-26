@@ -62,6 +62,18 @@
         </button>
     </div>
 </div>
+<div id="doctor-dashboard" style="display:none; padding: 20px; font-family: sans-serif;">
+    <div style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #28a745; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        <h2 style="color: #28a745; margin-top: 0;">👨‍⚕️ Hospital Waiting Room</h2>
+        <p>Welcome, <span id="display-doc-name" style="font-weight: bold;"></span></p>
+        <p style="color: #666; font-size: 14px;">Incoming patient requests for your hospital will appear below:</p>
+        <hr>
+        
+        <div id="waiting-list" style="min-height: 100px;">
+            <p id="no-patients" style="color: #999; text-align: center; padding: 20px;">No patients waiting at the moment...</p>
+        </div>
+    </div>
+</div>
     <div id="chat-container" style="display: none; height: 100vh; flex-direction: column;">
         <div class="chat-header" style="background: #007bff; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
             <span>🟢 Live Session</span>
@@ -139,6 +151,48 @@ function startDoctorFlow() {
     
     console.log(`${myUser} is now online at ${hosp}`);
 }
+// A. When a patient pays, this shows the request to ALL doctors in that hospital
+socket.on('new_patient_waiting', (data) => {
+    const list = document.getElementById('waiting-list');
+    const noPatientsMsg = document.getElementById('no-patients');
+    if (noPatientsMsg) noPatientsMsg.style.removeProperty('display'); // Hide "No patients" text
+    
+    const requestHtml = `
+        <div id="request-${data.session_id}" style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong style="font-size: 1.1em;">${data.patient_name}</strong>
+                <br><span style="font-size: 12px; color: #666;">ID: ${data.session_id}</span>
+            </div>
+            <button onclick="acceptPatient('${data.session_id}')" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                ACCEPT
+            </button>
+        </div>
+    `;
+    list.insertAdjacentHTML('afterbegin', requestHtml);
+});
+
+// B. When the doctor clicks ACCEPT
+function acceptPatient(sid) {
+    myRoom = sid;
+    // Tell the server: "I'm taking this patient, tell others to remove them"
+    socket.emit('doctor_accepted_patient', { session_id: sid, doctor_name: myUser });
+
+    // Switch UI to Chat
+    document.getElementById('doctor-dashboard').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+    
+    // Join the private room
+    socket.emit('join', { hospital: sid, user: myUser, role: 'Doctor' });
+}
+
+// C. This makes the request DISAPPEAR for other doctors in the same hospital
+socket.on('remove_patient_from_list', (data) => {
+    const element = document.getElementById(`request-${data.session_id}`);
+    if (element) {
+        element.remove();
+        console.log(`Patient ${data.session_id} was taken by another doctor.`);
+    }
+});
         // 1. PRIVATE CONSULTATION LOGIC
        // 1. UPDATED: Request with GPS Location
 async function testConsultation() {

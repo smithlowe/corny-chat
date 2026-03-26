@@ -109,6 +109,23 @@ def handle_payment_master(data):
         }, room=hospital_lounge)
         
         print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
+        @socketio.on('doctor_accepted_patient')
+def handle_acceptance(data):
+    session_id = data.get('session_id')
+    doc_name = data.get('doctor_name')
+    
+    # Get hospital_id for this session to tell the right lounge
+    res = supabase.table("consultations").select("hospital_id").eq("session_id", session_id).single().execute()
+    hosp_id = res.data['hospital_id']
+    
+    # Update Supabase to record which doctor took the case
+    supabase.table("consultations").update({"doctor_name": doc_name}).eq("session_id", session_id).execute()
+
+    # Broadcast to all OTHER doctors in that hospital lounge to remove the button
+    lounge_room = f"lounge_{hosp_id}"
+    emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room)
+    
+    print(f"✅ Doctor {doc_name} accepted session {session_id}. Removed from {lounge_room} queue.")
 @socketio.on('join')
 def on_join(data):
     room = data.get('hospital')
