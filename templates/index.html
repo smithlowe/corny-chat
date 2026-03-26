@@ -123,6 +123,17 @@
     myRoom = data.session_id;
     alert("Dr. " + data.doctor + " is ready to assist you.");
 });
+socket.on('remove_patient_from_list', function(data) {
+    console.log("🚫 Removing claimed patient: " + data.session_id);
+    
+    // Find the specific patient element by its ID or a data attribute
+    // Assuming your list items have an ID like "req-cons-abc123"
+    const patientRow = document.getElementById('req-' + data.session_id);
+    
+    if (patientRow) {
+        patientRow.remove();
+    }
+});
         // 🟠 PATIENT FLOW: Triggered by Orange Button
 function startPatientFlow() {
     const name = document.getElementById('username').value;
@@ -168,23 +179,18 @@ function startDoctorFlow() {
     console.log(`${myUser} is now online at ${hosp}`);
 }
 // A. When a patient pays, this shows the request to ALL doctors in that hospital
-socket.on('new_patient_waiting', (data) => {
+socket.on('new_patient_waiting', function(data) {
     const list = document.getElementById('waiting-list');
-    const noPatientsMsg = document.getElementById('no-patients');
-    if (noPatientsMsg) noPatientsMsg.style.removeProperty('display'); // Hide "No patients" text
     
-    const requestHtml = `
-        <div id="request-${data.session_id}" style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <strong style="font-size: 1.1em;">${data.patient_name}</strong>
-                <br><span style="font-size: 12px; color: #666;">ID: ${data.session_id}</span>
-            </div>
-            <button onclick="acceptPatient('${data.session_id}')" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
-                ACCEPT
-            </button>
+    // Notice the id="req-${data.session_id}" below. 
+    // This is the "handle" that allows the remove function to find it!
+    const item = `
+        <div id="req-${data.session_id}" class="patient-card">
+            <p><strong>Patient:</strong> ${data.patient_name}</p>
+            <button onclick="acceptPatient('${data.session_id}')">Accept</button>
         </div>
     `;
-    list.insertAdjacentHTML('afterbegin', requestHtml);
+    list.insertAdjacentHTML('beforeend', item);
 });
 
 // B. When the doctor clicks ACCEPT

@@ -152,21 +152,18 @@ def on_join(data):
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
-    doc_name = data.get('doctor_name')
     hosp = data.get('hospital', 'unknown')
+    lounge_room = f"lounge_{str(hosp).lower()}"
 
-    # 1. Update status in Supabase so the security 'join' check passes
+    # 1. Update Supabase status to 'active' or 'taken'
     supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
 
-    # 2. TRIGGER THE PATIENT'S UI CHANGE (This is what removes the waiting screen)
-    emit('match_found', {
-        'session_id': session_id, 
-        'doctor': doc_name
-    }, room=session_id) 
+    # 2. Tell the Patient they are matched (Same as before)
+    emit('match_found', {'session_id': session_id, 'doctor': data.get('doctor_name')}, room=session_id)
 
-    # 3. Clean up the lounge for other doctors
-    lounge_room = f"lounge_{str(hosp).lower()}"
-    emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, broadcast=True)
+    # 3. THE FIX: Tell all other doctors in the lounge to remove this patient
+    # 'include_self=False' ensures the current doctor's UI doesn't break
+    emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')
