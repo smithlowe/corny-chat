@@ -154,20 +154,21 @@ def handle_patient_waiting(data):
 def handle_acceptance(data):
     session_id = data.get('session_id')
     doc_name = data.get('doctor_name')
+    hosp = data.get('hospital', 'unknown')
 
-    # Update status in Supabase so the lock is opened
+    # 1. Update DB
     supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
 
-    # BROADCAST to the specific session room
-    # This triggers the 'match_found' listener on the patient's side
+    # 2. TRIGGER THE PATIENT'S UI CHANGE
+    # We send 'match_found' to the specific session_id room
     emit('match_found', {
         'session_id': session_id, 
         'doctor': doc_name
     }, room=session_id) 
-    
-    # Optional: Tell other doctors to remove this patient from their list
-    lounge_room = f"lounge_{data.get('hospital', '').lower()}"
-    emit('remove_apatient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
+
+    # 3. Clean up the lounge for other doctors
+    lounge_room = f"lounge_{str(hosp).lower()}"
+    emit('remove_apatient_from_list', {'session_id': session_id}, room=lounge_room, broadcast=True)
 @socketio.on('send_message')
 def handle_message(data):
     msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')

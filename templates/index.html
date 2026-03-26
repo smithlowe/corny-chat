@@ -107,6 +107,24 @@
 <script>
         let socket = io(), myUser = "", myRoom = "";
         let mediaRecorder, audioChunks = [], timerInterval, seconds = 0;
+        socket.on('match_found', function(data) {
+    console.log("✅ Match found! Removing waiting screen...");
+    
+    // Remove the orange waiting screen
+    const waitingScreen = document.getElementById('patient-waiting-screen');
+    if (waitingScreen) {
+        waitingScreen.remove();
+    }
+
+    // Show the chat
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+    
+    // Set the global room variable so messages go to the right place
+    myRoom = data.session_id;
+    
+    alert("Dr. " + data.doctor + " has joined the session.");
+});
         // 🟠 PATIENT FLOW: Triggered by Orange Button
 function startPatientFlow() {
     const name = document.getElementById('username').value;
@@ -172,28 +190,26 @@ socket.on('new_patient_waiting', (data) => {
 });
 
 // B. When the doctor clicks ACCEPT
-function acceptPatient(sid) {
-    myRoom = sid;
-    // Tell the server: "I'm taking this patient, tell others to remove them"
-    socket.emit('doctor_accepted_patient', { session_id: sid, doctor_name: myUser });
+// --- DOCTOR ACTIONS ---
 
-    // Switch UI to Chat
+function acceptPatient(sid) {
+    const hosp = document.getElementById('hospSelect').value; // Grabs the hospital name
+    myRoom = sid; 
+
+    // 1. Tell the server the doctor has accepted
+    socket.emit('doctor_accepted_patient', { 
+        session_id: sid, 
+        doctor_name: myUser,
+        hospital: hosp 
+    });
+
+    // 2. Move the doctor into the private chat room
+    socket.emit('join', { hospital: sid, user: myUser, role: 'Doctor' });
+
+    // 3. Switch the Doctor's UI to Chat
     document.getElementById('doctor-dashboard').style.display = 'none';
     document.getElementById('chat-container').style.display = 'flex';
-    
-    // Join the private room
-    socket.emit('join', { hospital: sid, user: myUser, role: 'Doctor' });
 }
-
-// C. This makes the request DISAPPEAR for other doctors in the same hospital
-// ❌ Change 'remove_patient_from_list' to 'remove_apatient_from_list'
-socket.on('remove_apatient_from_list', (data) => {
-    const element = document.getElementById(`request-${data.session_id}`);
-    if (element) {
-        element.remove();
-        console.log(`Patient ${data.session_id} taken.`);
-    }
-});
         // 1. PRIVATE CONSULTATION LOGIC
        // 1. UPDATED: Request with GPS Location
 // --- 🟠 CONSOLIDATED PATIENT FLOW ---
@@ -260,9 +276,9 @@ socket.on('new_patient_waiting', (data) => {
     const patientRow = `
         <div id="row-${data.session_id}" style="border: 1px solid #28a745; padding: 10px; margin-bottom: 5px; border-radius: 5px;">
             <p><strong>Patient:</strong> ${data.patient_name}</p>
-            <button onclick="acceptPatient('${data.session_id}')" style="background:#28a745; color:white; border:none; padding:5px; cursor:pointer;">
-                Accept & Start Chat
-            </button>
+            <button onclick="acceptPatient('${data.session_id}')" style="...">
+    Accept & Start Chat
+</button>
         </div>
     `;
     list.innerHTML = patientRow + list.innerHTML; // Put new patients at the top
@@ -312,22 +328,7 @@ function send() {
             sessionStorage.setItem('session_chat', JSON.stringify(chat));
         });
         // 👂 This is the Patient's "Ear". It waits for the Doctor's signal.
-socket.on('match_found', function(data) {
-    console.log("✅ Doctor connected! Session ID:", data.session_id);
-    
-    // 1. Remove the Orange Waiting Screen
-    const waitingScreen = document.getElementById('patient-waiting-screen');
-    if (waitingScreen) {
-        waitingScreen.remove();
-    }
 
-    // 2. Show the Chat UI
-    document.getElementById('login-overlay').style.display = 'none';
-    document.getElementById('chat-container').style.display = 'flex';
-    
-    // 3. Update UI with Doctor's Name
-    alert("Dr. " + data.doctor + " is now online to help you.");
-});
 
         function renderMsg(data) {
             const container = document.getElementById('messages');
