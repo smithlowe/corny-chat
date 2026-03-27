@@ -470,31 +470,36 @@ function send() {
     };
 
     xhr.onload = () => {
-        const response = JSON.parse(xhr.responseText);
-        document.getElementById('upload-container').style.display = 'none';
+        try {
+            const response = JSON.parse(xhr.responseText);
+            document.getElementById('upload-container').style.display = 'none';
 
-        if (response.success) {
-            // Detect file type
-            let type = 'file';
-            if (file.type.startsWith('image/')) type = 'image';
-            else if (file.type.startsWith('video/')) type = 'video';
-            else if (file.type.startsWith('audio/')) type = 'audio';
+            if (response.success && response.url) {
+                console.log("📤 Upload Success! Link:", response.url);
 
-            // SEND THE DATA DIRECTLY
-            socket.emit('send_message', { 
-                hospital: myRoom, 
-                user: myUser, 
-                message: "", 
-                media_url: response.url, 
-                media_type: type 
-            });
-            console.log("Media sent successfully!");
+                let fileCategory = 'image'; 
+                if (file.type.startsWith('video/')) fileCategory = 'video';
+                if (file.type.startsWith('audio/')) fileCategory = 'audio';
+
+                socket.emit('send_message', { 
+                    hospital: myRoom, 
+                    user: myUser, 
+                    message: "", 
+                    media_url: response.url, 
+                    media_type: fileCategory 
+                });
+            } else {
+                console.error("❌ Upload failed or no URL in response:", response);
+            }
+        } catch (e) {
+            console.error("❌ Error parsing upload response:", e);
         }
     }; // <--- THIS WAS MISSING: Closes xhr.onload
 
+    // THE REST OF THE AJAX CALL (ALSO MISSING)
     xhr.open('POST', '/upload');
     xhr.send(formData);
-} // <--- Closes uploadFile
+} // <--- THIS WAS MISSING: Closes uploadFile
         // Connect Mic Button to Functions
         const mBtn = document.getElementById('mic-btn');
         if(mBtn) {

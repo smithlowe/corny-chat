@@ -166,11 +166,31 @@ def handle_acceptance(data):
     emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
 @socketio.on('send_message')
 def handle_message(data):
-    msg, sender, hosp, doc = data.get('message'), data.get('user'), data.get('hospital'), data.get('doctor_name')
+    # 1. Extract data for the Database
+    msg = data.get('message', "")
+    sender = data.get('user', "Unknown")
+    hosp = data.get('hospital')
+    doc = data.get('doctor_name')
+    
+    # NEW: Get the media fields so we can save them to DB too!
+    media_url = data.get('media_url')
+    media_type = data.get('media_type')
+
     try:
-        # Keep record in DB for medical logs, but don't broadcast old ones to new users
-        supabase.table("messages").insert({"sender": sender, "content": msg, "hospital": hosp, "doctor_name": doc}).execute()
-        emit('receive_message', {'user': sender, 'message': msg}, to=hosp)
+        # 2. Save to Supabase (Add media_url and media_type to your table columns if they exist)
+        supabase.table("messages").insert({
+            "sender": sender, 
+            "content": msg, 
+            "hospital": hosp, 
+            "doctor_name": doc,
+            "media_url": media_url, # Optional: Save the link to your DB history
+            "media_type": media_type
+        }).execute()
+
+        # 3. CRITICAL FIX: Broadcast the WHOLE 'data' object
+        # This ensures 'media_url' and 'media_type' actually reach the other user
+        emit('receive_message', data, to=hosp)
+
     except Exception as e:
         print(f"DB Error: {e}")
 
