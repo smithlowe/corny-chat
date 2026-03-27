@@ -21,18 +21,33 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     z-index: 100;
 }
+        /* Existing styles */
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; }
         #chat-container { display: none; flex-direction: column; height: 100vh; background: white; }
         #messages { flex: 1; overflow-y: auto; padding: 15px; margin-top: 60px; margin-bottom: 110px; display: flex; flex-direction: column; }
-        .msg { padding: 10px 15px; border-radius: 18px; max-width: 75%; margin-bottom: 10px; font-size: 15px; }
+        .msg { padding: 10px 15px; border-radius: 18px; max-width: 75%; margin-bottom: 10px; font-size: 15px; line-height: 1.4; position: relative; }
         .my { align-self: flex-end; background: #007bff; color: white; border-bottom-right-radius: 2px; }
         .other { align-self: flex-start; background: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
+
+        /* THE DIRECT MEDIA FIX */
         .chat-media-style {
-    display: block;
-    margin-top: 5px;
-    border: 1px solid #ddd;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
+            display: block;
+            max-width: 100%; /* Fits perfectly inside the bubble */
+            height: auto;
+            border-radius: 12px; /* Smooth corners for medical scans */
+            margin-top: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        /* Make audio players fit in the bubbles */
+        audio.chat-media-style {
+            max-width: 220px;
+            height: 35px;
+        }
+
         .chat-header { background: #007bff; color: white; padding: 15px; position: fixed; top: 0; width: 100%; display: flex; justify-content: space-between; z-index: 10; box-sizing: border-box; }
         .input-area { position: fixed; bottom: 0; width: 100%; padding: 10px; background: #f8f9fa; border-top: 1px solid #ddd; display: grid; grid-template-columns: 50px 1fr 40px 70px; gap: 8px; align-items: center; box-sizing: border-box; }
         #login-overlay { position: fixed; inset: 0; background: #f0f2f5; display: flex; align-items: center; justify-content: center; z-index: 20; }
@@ -455,35 +470,31 @@ function send() {
     };
 
     xhr.onload = () => {
-        try {
-            const response = JSON.parse(xhr.responseText);
-            document.getElementById('upload-container').style.display = 'none';
+        const response = JSON.parse(xhr.responseText);
+        document.getElementById('upload-container').style.display = 'none';
 
-            if (response.success) {
-                const isImage = file.type.startsWith('image/');
-                const type = isImage ? 'image' : 'video';
+        if (response.success) {
+            // Detect file type
+            let type = 'file';
+            if (file.type.startsWith('image/')) type = 'image';
+            else if (file.type.startsWith('video/')) type = 'video';
+            else if (file.type.startsWith('audio/')) type = 'audio';
 
-                socket.emit('send_message', { 
-                    hospital: myRoom, 
-                    user: myUser, 
-                    message: "", 
-                    media_url: response.url, 
-                    media_type: type 
-                });
-
-                console.log("✅ File sent to socket:", response.url);
-            } else {
-                alert("Upload failed: " + response.error);
-            }
-        } catch (e) {
-            console.error("Parsing error:", e);
+            // SEND THE DATA DIRECTLY
+            socket.emit('send_message', { 
+                hospital: myRoom, 
+                user: myUser, 
+                message: "", 
+                media_url: response.url, 
+                media_type: type 
+            });
+            console.log("Media sent successfully!");
         }
-    }; // <--- Closes xhr.onload
+    }; // <--- THIS WAS MISSING: Closes xhr.onload
 
     xhr.open('POST', '/upload');
     xhr.send(formData);
-} // <--- Closes uploadFile (This was the one missing!)
-
+} // <--- Closes uploadFile
         // Connect Mic Button to Functions
         const mBtn = document.getElementById('mic-btn');
         if(mBtn) {
