@@ -348,29 +348,37 @@ function send() {
     }
 }
         socket.on('receive_message', (data) => {
-    console.log("📩 Message Received:", data); // Check your F12 Console to see if media_url is here!
+    console.log("📩 Message Received:", data);
     
     const container = document.getElementById('messages');
     if (!container) return;
 
     const d = document.createElement('div');
-    const isMe = (data.user === myUser);
+    const isMe = (data.user === myUser || data.sender === myUser);
     d.className = `msg ${isMe ? 'my' : 'other'}`;
 
     let content = "";
 
-    // ⚡️ THE DIRECT MEDIA CHECK
+    // 1. Check for CLEAN MEDIA URL (The new way)
     if (data.media_url) {
-        if (data.media_type === 'image' || data.media_url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
-            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:250px; display:block; border-radius:8px;">`;
-        } else if (data.media_type === 'video' || data.media_url.match(/\.(mp4|webm)$/) != null) {
+        if (data.media_type === 'image') {
+            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:250px; border-radius:8px;">`;
+        } else if (data.media_type === 'video') {
             content = `<video controls class="chat-media-style" style="max-width:250px;"><source src="${data.media_url}"></video>`;
+        } else if (data.media_type === 'audio') {
+            content = `<audio controls src="${data.media_url}"></audio>`;
         }
-    } else {
+    } 
+    // 2. Check for HTML STRINGS in the message (Your current log shows this)
+    else if (data.message && (data.message.includes('<img') || data.message.includes('<audio') || data.message.includes('<video'))) {
+        content = data.message; // Directly show the HTML tag sent by the server
+    } 
+    // 3. Otherwise, it's just plain text
+    else {
         content = `<p>${data.message || ""}</p>`;
     }
 
-    d.innerHTML = `<strong>${data.user || "User"}:</strong><br>${content}`;
+    d.innerHTML = `<strong>${data.user || data.sender || "User"}:</strong><br>${content}`;
     
     container.appendChild(d);
     container.scrollTop = container.scrollHeight;
