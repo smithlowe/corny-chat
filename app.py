@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 import os
 import uuid
 from flask import Flask, render_template, request, jsonify
@@ -9,13 +6,14 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'med_secure_2026'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Supabase Setup
+# Fixed: Removed the double async_mode and set it to gevent
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+
+# Supabase Setup (Remains exactly as you had it)
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
-
 @app.route('/')
 def index():
     return render_template('index.html')

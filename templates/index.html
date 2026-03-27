@@ -363,45 +363,37 @@ function send() {
     }
 }
         socket.on('receive_message', (data) => {
-    console.log("📩 Message Received:", data);
-    
+    console.log("📩 RECEIVER GOT:", data); 
     const container = document.getElementById('messages');
-    if (!container) return;
-
+    
     const d = document.createElement('div');
-    const isMe = (data.user === myUser || data.sender === myUser);
+    // Check both sender and user keys
+    const senderName = data.user || data.sender || "Unknown";
+    const isMe = (senderName === myUser);
     d.className = `msg ${isMe ? 'my' : 'other'}`;
 
     let content = "";
 
-    // 1. Check for CLEAN MEDIA URL (The new way)
+    // 1. If it's a direct Media URL (Photos/Videos)
     if (data.media_url) {
         if (data.media_type === 'image') {
-            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:250px; border-radius:8px;">`;
-        } else if (data.media_type === 'video') {
-            content = `<video controls class="chat-media-style" style="max-width:250px;"><source src="${data.media_url}"></video>`;
+            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:250px;">`;
         } else if (data.media_type === 'audio') {
             content = `<audio controls src="${data.media_url}"></audio>`;
         }
     } 
-    // 2. Check for HTML STRINGS in the message (Your current log shows this)
-    else if (data.message && (data.message.includes('<img') || data.message.includes('<audio') || data.message.includes('<video'))) {
-        content = data.message; // Directly show the HTML tag sent by the server
-    } 
-    // 3. Otherwise, it's just plain text
+    // 2. If it's a Voice Note sent as HTML
+    else if (data.message && data.message.includes('<audio')) {
+        content = data.message; 
+    }
+    // 3. Plain text
     else {
         content = `<p>${data.message || ""}</p>`;
     }
 
-    d.innerHTML = `<strong>${data.user || data.sender || "User"}:</strong><br>${content}`;
-    
+    d.innerHTML = `<strong>${senderName}:</strong><br>${content}`;
     container.appendChild(d);
     container.scrollTop = container.scrollHeight;
-
-    // Save to history
-    let chat = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
-    chat.push(data);
-    sessionStorage.setItem('session_chat', JSON.stringify(chat));
 });
         // 👂 This is the Patient's "Ear". It waits for the Doctor's signal.
 
