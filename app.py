@@ -164,35 +164,27 @@ def handle_acceptance(data):
     # 3. THE FIX: Tell all other doctors in the lounge to remove this patient
     # 'include_self=False' ensures the current doctor's UI doesn't break
     emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
+# ... all your other routes and imports above ...
+
 @socketio.on('send_message')
 def handle_message(data):
-    # 1. Extract data for the Database
-    msg = data.get('message', "")
-    sender = data.get('user', "Unknown")
     hosp = data.get('hospital')
-    doc = data.get('doctor_name')
+    if not hosp:
+        return
     
-    # NEW: Get the media fields so we can save them to DB too!
-    media_url = data.get('media_url')
-    media_type = data.get('media_type')
+    # Broadcast to everyone in the hospital room
+    emit('receive_message', data, to=hosp)
 
     try:
-        # 2. Save to Supabase (Add media_url and media_type to your table columns if they exist)
         supabase.table("messages").insert({
-            "sender": sender, 
-            "content": msg, 
+            "sender": data.get('user', 'Unknown'), 
+            "content": data.get('message', ''), 
             "hospital": hosp, 
-            "doctor_name": doc,
-            "media_url": media_url, # Optional: Save the link to your DB history
-            "media_type": media_type
+            "doctor_name": data.get('doctor_name', '')
         }).execute()
-
-        # 3. CRITICAL FIX: Broadcast the WHOLE 'data' object
-        # This ensures 'media_url' and 'media_type' actually reach the other user
-        emit('receive_message', data, to=hosp)
-
     except Exception as e:
-        print(f"DB Error: {e}")
+        print(f"⚠️ Database Log Error: {e}")
 
+# THIS MUST BE THE ABSOLUTE LAST TWO LINES
 if __name__ == '__main__':
     socketio.run(app)
