@@ -431,45 +431,50 @@ function send() {
         }
 
         function uploadFile() {
-            const file = document.getElementById('fIn').files[0];
-            if (!file) return;
-            const formData = new FormData();
-            formData.append('file', file);
-            document.getElementById('upload-container').style.display = 'block';
-            const xhr = new XMLHttpRequest();
-            xhr.upload.onprogress = (e) => {
-                const percent = Math.round((e.loaded / e.total) * 100);
-                document.getElementById('upload-bar').style.width = percent + '%';
-                document.getElementById('upload-text').innerText = "Uploading: " + percent + "%";
-            };
-            xhr.onload = () => {
-    try {
-        const response = JSON.parse(xhr.responseText);
-        document.getElementById('upload-container').style.display = 'none';
+    const file = document.getElementById('fIn').files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    document.getElementById('upload-container').style.display = 'block';
+    
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.onprogress = (e) => {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        document.getElementById('upload-bar').style.width = percent + '%';
+        document.getElementById('upload-text').innerText = "Uploading: " + percent + "%";
+    };
 
-        if (response.success) {
-            // 1. Check if it's an image or video
-            const isImage = file.type.startsWith('image/');
-            const type = isImage ? 'image' : 'video';
+    xhr.onload = () => {
+        try {
+            const response = JSON.parse(xhr.responseText);
+            document.getElementById('upload-container').style.display = 'none';
 
-            // 2. EMIT DATA (Not HTML tags)
-            // Note: If your server uses 'room' instead of 'hospital', change it here!
-            socket.emit('send_message', { 
-                hospital: myRoom, 
-                user: myUser, 
-                message: "", // Send empty text because we are sending a file
-                media_url: response.url, 
-                media_type: type 
-            });
+            if (response.success) {
+                const isImage = file.type.startsWith('image/');
+                const type = isImage ? 'image' : 'video';
 
-            console.log("✅ File sent to socket:", response.url);
-        } else {
-            alert("Upload failed: " + response.error);
+                socket.emit('send_message', { 
+                    hospital: myRoom, 
+                    user: myUser, 
+                    message: "", 
+                    media_url: response.url, 
+                    media_type: type 
+                });
+
+                console.log("✅ File sent to socket:", response.url);
+            } else {
+                alert("Upload failed: " + response.error);
+            }
+        } catch (e) {
+            console.error("Parsing error:", e);
         }
-    } catch (e) {
-        console.error("Parsing error:", e);
-    }
-};
+    }; // <--- Closes xhr.onload
+
+    xhr.open('POST', '/upload');
+    xhr.send(formData);
+} // <--- Closes uploadFile (This was the one missing!)
 
         // Connect Mic Button to Functions
         const mBtn = document.getElementById('mic-btn');
