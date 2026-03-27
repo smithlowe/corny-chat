@@ -27,6 +27,12 @@
         .msg { padding: 10px 15px; border-radius: 18px; max-width: 75%; margin-bottom: 10px; font-size: 15px; }
         .my { align-self: flex-end; background: #007bff; color: white; border-bottom-right-radius: 2px; }
         .other { align-self: flex-start; background: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
+        .chat-media-style {
+    display: block;
+    margin-top: 5px;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
         .chat-header { background: #007bff; color: white; padding: 15px; position: fixed; top: 0; width: 100%; display: flex; justify-content: space-between; z-index: 10; box-sizing: border-box; }
         .input-area { position: fixed; bottom: 0; width: 100%; padding: 10px; background: #f8f9fa; border-top: 1px solid #ddd; display: grid; grid-template-columns: 50px 1fr 40px 70px; gap: 8px; align-items: center; box-sizing: border-box; }
         #login-overlay { position: fixed; inset: 0; background: #f0f2f5; display: flex; align-items: center; justify-content: center; z-index: 20; }
@@ -342,22 +348,48 @@ function send() {
     }
 }
         socket.on('receive_message', (data) => {
-            renderMsg(data);
-            let chat = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
-            chat.push(data);
-            sessionStorage.setItem('session_chat', JSON.stringify(chat));
-        });
+    const container = document.getElementById('messages'); // Use your actual ID here
+    if (!container) return;
+
+    // 1. Create the message element
+    const d = document.createElement('div');
+    
+    // Logic for 'my' vs 'other' bubbles
+    const isMe = (data.user === myUser || data.sender === myUser);
+    d.className = `msg ${isMe ? 'my' : 'other'}`;
+
+    let content = "";
+
+    // 2. CHECK: Is this Media or Text? (This prevents the "Code Wall")
+    if (data.media_url) {
+        if (data.media_type === 'image') {
+            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:100%; border-radius:8px; margin-top:5px;">`;
+        } else {
+            content = `<video controls class="chat-media-style" style="max-width:100%;"><source src="${data.media_url}"></video>`;
+        }
+    } else {
+        // Just regular text
+        content = data.message || "";
+    }
+
+    // 3. Build the inside of the bubble
+    // Note: check if your server uses data.user or data.sender
+    const displayName = data.user || data.sender || "Unknown";
+    d.innerHTML = `<strong>${displayName}</strong><br>${content}`;
+    
+    // 4. Add to screen and scroll down
+    container.appendChild(d);
+    container.scrollTop = container.scrollHeight;
+
+    // 5. SAVE TO HISTORY (Crucial for page refreshes)
+    let chat = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
+    chat.push(data);
+    sessionStorage.setItem('session_chat', JSON.stringify(chat));
+});
         // 👂 This is the Patient's "Ear". It waits for the Doctor's signal.
 
 
-        function renderMsg(data) {
-            const container = document.getElementById('messages');
-            const d = document.createElement('div');
-            d.className = `msg ${data.user === myUser ? 'my' : 'other'}`;
-            d.innerHTML = `<strong>${data.user}</strong><br>${data.message}`;
-            container.appendChild(d);
-            container.scrollTop = container.scrollHeight;
-        }
+        
 
         // 4. VOICE & FILE FUNCTIONS (Untouched & Stable)
         async function startRecording() {
