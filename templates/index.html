@@ -348,40 +348,34 @@ function send() {
     }
 }
         socket.on('receive_message', (data) => {
-    const container = document.getElementById('messages'); // Use your actual ID here
+    console.log("📩 Message Received:", data); // Check your F12 Console to see if media_url is here!
+    
+    const container = document.getElementById('messages');
     if (!container) return;
 
-    // 1. Create the message element
     const d = document.createElement('div');
-    
-    // Logic for 'my' vs 'other' bubbles
-    const isMe = (data.user === myUser || data.sender === myUser);
+    const isMe = (data.user === myUser);
     d.className = `msg ${isMe ? 'my' : 'other'}`;
 
     let content = "";
 
-    // 2. CHECK: Is this Media or Text? (This prevents the "Code Wall")
+    // ⚡️ THE DIRECT MEDIA CHECK
     if (data.media_url) {
-        if (data.media_type === 'image') {
-            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:100%; border-radius:8px; margin-top:5px;">`;
-        } else {
-            content = `<video controls class="chat-media-style" style="max-width:100%;"><source src="${data.media_url}"></video>`;
+        if (data.media_type === 'image' || data.media_url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
+            content = `<img src="${data.media_url}" class="chat-media-style" style="max-width:250px; display:block; border-radius:8px;">`;
+        } else if (data.media_type === 'video' || data.media_url.match(/\.(mp4|webm)$/) != null) {
+            content = `<video controls class="chat-media-style" style="max-width:250px;"><source src="${data.media_url}"></video>`;
         }
     } else {
-        // Just regular text
-        content = data.message || "";
+        content = `<p>${data.message || ""}</p>`;
     }
 
-    // 3. Build the inside of the bubble
-    // Note: check if your server uses data.user or data.sender
-    const displayName = data.user || data.sender || "Unknown";
-    d.innerHTML = `<strong>${displayName}</strong><br>${content}`;
+    d.innerHTML = `<strong>${data.user || "User"}:</strong><br>${content}`;
     
-    // 4. Add to screen and scroll down
     container.appendChild(d);
     container.scrollTop = container.scrollHeight;
 
-    // 5. SAVE TO HISTORY (Crucial for page refreshes)
+    // Save to history
     let chat = JSON.parse(sessionStorage.getItem('session_chat') || "[]");
     chat.push(data);
     sessionStorage.setItem('session_chat', JSON.stringify(chat));
@@ -449,16 +443,33 @@ function send() {
                 document.getElementById('upload-text').innerText = "Uploading: " + percent + "%";
             };
             xhr.onload = () => {
-                const response = JSON.parse(xhr.responseText);
-                document.getElementById('upload-container').style.display = 'none';
-                if (response.success) {
-                    let content = file.type.startsWith('image/') ? `<img src="${response.url}" style="max-width:250px;">` : `<a href="${response.url}" target="_blank">View File</a>`;
-                    socket.emit('send_message', { message: content, user: myUser, hospital: myRoom });
-                }
-            };
-            xhr.open('POST', '/upload');
-            xhr.send(formData);
+    try {
+        const response = JSON.parse(xhr.responseText);
+        document.getElementById('upload-container').style.display = 'none';
+
+        if (response.success) {
+            // 1. Check if it's an image or video
+            const isImage = file.type.startsWith('image/');
+            const type = isImage ? 'image' : 'video';
+
+            // 2. EMIT DATA (Not HTML tags)
+            // Note: If your server uses 'room' instead of 'hospital', change it here!
+            socket.emit('send_message', { 
+                hospital: myRoom, 
+                user: myUser, 
+                message: "", // Send empty text because we are sending a file
+                media_url: response.url, 
+                media_type: type 
+            });
+
+            console.log("✅ File sent to socket:", response.url);
+        } else {
+            alert("Upload failed: " + response.error);
         }
+    } catch (e) {
+        console.error("Parsing error:", e);
+    }
+};
 
         // Connect Mic Button to Functions
         const mBtn = document.getElementById('mic-btn');
