@@ -272,53 +272,54 @@
 
     // CONSOLIDATED PATIENT FLOW
     // --- UPDATE THIS SECTION ---
+// --- FUNCTION 1: THE ACTION ---
 function testConsultation() {
     const name = document.getElementById('username').value;
     const select = document.getElementById('hospSelect');
     
-    // Safety checks
-    if (!name) return alert("Please enter your name first!");
-    if (!select.value || select.selectedIndex === -1) return alert("Please select a hospital!");
+    if (!name) return alert("Please enter your name!");
+    if (!select.value) return alert("Please select a hospital!");
 
     const selectedOption = select.options[select.selectedIndex];
     const hospCode = select.value;
-    const hospName = selectedOption.text.split(' -')[0];
+    const rawFee = selectedOption.getAttribute('data-fee') || "5,000";
+    const cleanFee = rawFee.replace(/[^0-9]/g, '');
 
-    // 💰 1. Get the fee and clean it for the database (BIGINT safe)
-    const rawFee = selectedOption.getAttribute('data-fee') || "5,000"; 
-    const cleanFee = rawFee.replace(/[^0-9]/g, ''); 
-
-    // 📱 2. Payment Prompt
-    let phone = prompt(`🏥 Hospital: ${hospName}\n💰 Fee: ${rawFee} UGX\n\nEnter 10-digit Number (MTN/Airtel):`);
-    
-    // Check for valid Ugandan 10-digit number
-    if (!phone || !/^\d{10}$/.test(phone)) {
-        return alert("❌ Invalid 10-digit phone number!");
-    }
+    let phone = prompt(`Confirm Payment of ${rawFee} UGX\nEnter MTN/Airtel Number:`);
+    if (!phone || !/^\d{10}$/.test(phone)) return alert("❌ Invalid number!");
 
     const session_id = "cons-" + Math.random().toString(36).substr(2, 9);
     
-    // Set global variables for the chat
     myUser = name;
+    myRole = 'Patient';
     myRoom = session_id;
 
-    // 📡 3. SEND EVERYTHING TO PYTHON & SUPABASE
+    saveSession({ 
+        user: myUser, 
+        role: myRole, 
+        room: myRoom, 
+        hospCode: hospCode 
+    });
+
     socket.emit('patient_paid_and_waiting', { 
         patient_name: name, 
         hospital_id: hospCode,
         phone: phone,
         session_id: session_id,
-        amount_paid: parseInt(cleanFee), // Sends as a number for your SQL BIGINT
+        amount_paid: parseInt(cleanFee),
         status: 'pending'
     });
 
-    // 4. Join the specific chat room
-    socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
-    
-    // 5. Hide the login overlay
-    document.getElementById('login-overlay').style.display = 'none';
+    socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
 
-    // 6. Create the waiting screen UI
+    document.getElementById('login-overlay').style.display = 'none';
+    
+    // CALL the second function here
+    showWaitingScreen(name, selectedOption.text.split(' -')[0]);
+} // <--- Only ONE brace here to close the function
+
+// --- FUNCTION 2: THE UI BUILDER ---
+function showWaitingScreen(name, hospName) {
     const waitingArea = document.createElement('div');
     waitingArea.id = "patient-waiting-screen";
     waitingArea.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:3000;";
@@ -333,16 +334,54 @@ function testConsultation() {
     `;
     document.body.appendChild(waitingArea);
 }
+// 💾 Save session to browser memory
+function saveSession(data) {
+    localStorage.setItem('corny_session', JSON.stringify(data));
+}
+
+// 🔄 Auto-login if a session exists
+function checkExistingSession() {
+    const saved = localStorage.getItem('corny_session');
+    if (saved) {
+        const data = JSON.parse(saved);
+        myUser = data.user;
+        myRole = data.role;
+        myRoom = data.room;
+        const hospCode = data.hospCode;
+
+        // Re-join the correct room automatically
+        socket.emit('join', { hospital: myRoom || `lounge_${hospCode}`, user: myUser, role: myRole });
+
+        // UI: Hide login, show correct screen
+        document.getElementById('login-overlay').style.display = 'none';
+        if (myRole === 'Doctor') {
+            document.getElementById('doctor-dashboard').style.display = 'block';
+        } else {
+            document.getElementById('chat-container').style.display = 'flex';
+        }
+    }
+}
+
+// Run this the moment the page loads
+window.onload = checkExistingSession;
 
     function enterClinic() {
-        const docName = document.getElementById('username').value;
-        const hosp = document.getElementById('hospSelect').value;
-        if (!docName) return alert("Please enter your name first");
-        myUser = docName;
-        socket.emit('join_lounge', { doctor: docName, hospital: hosp });
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('doctor-dashboard').style.display = 'block';
-    }
+    const docName = document.getElementById('username').value;
+    const hosp = document.getElementById('hospSelect').value;
+    if (!docName) return alert("Please enter your name first");
+
+    myUser = docName;
+    myRole = 'Doctor';
+    myRoom = `lounge_${hosp.toLowerCase()}`;
+
+    // 💾 SAVE THE SESSION DATA
+    saveSession({ user: myUser, role: myRole, room: myRoom, hospCode: hosp });
+
+    socket.emit('join', { hospital: myRoom, user: myUser, role: myRole });
+    
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('doctor-dashboard').style.display = 'block';
+}
 
     socket.on('new_patient_waiting', (data) => {
         const list = document.getElementById('waiting-list');
@@ -361,18 +400,22 @@ function testConsultation() {
         }
     });
 
-    function acceptPatient(sid) {
-        const hosp = document.getElementById('hospSelect').value;
-        myRoom = sid; 
-        socket.emit('doctor_accepted_patient', { 
-            session_id: sid, 
-            doctor_name: myUser,
-            hospital: hosp 
-        });
-        socket.emit('join', { hospital: sid, user: myUser, role: 'Doctor' });
-        document.getElementById('doctor-dashboard').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'flex';
-    }
+    function acceptPatient(session_id) {
+    myRoom = session_id; // Set the chat room to the patient's session
+    
+    // 1. Join the private chat room
+    socket.emit('join', { hospital: session_id, user: myUser, role: 'Doctor' });
+
+    // 2. Hide Dashboard, Show Chat
+    document.getElementById('doctor-dashboard').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+    
+    // 3. Clear the waiting list UI if needed
+    const row = document.querySelector(`.req-${session_id}`);
+    if (row) row.remove();
+    
+    console.log("Joined patient chat:", session_id);
+}
 
     function logout() {
         localStorage.clear();

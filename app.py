@@ -128,33 +128,35 @@ def handle_disconnect():
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
     p_name = data.get('patient_name')
-    h_id = data.get('hospital', 'unknown')
+    # 🚨 FIX: Match the 'hospital_id' key from your JS
+    h_id = data.get('hospital_id', 'unknown') 
     s_id = data.get('session_id')
     
-    # 💰 NEW: Pull the specific fee sent from the frontend 
-    # If for some reason it's missing, it defaults to 5000
-    actual_fee = data.get('fee', 5000)
+    # 🚨 FIX: Match the 'amount_paid' key from your JS
+    actual_fee = data.get('amount_paid', 5000)
 
     try:
-        # Match your SQL structure exactly
+        # Save to Supabase
         supabase.table("consultations").insert({
             "session_id": s_id,
             "patient_name": p_name,
-            "hospital_id": h_id,
+            "hospital_id": str(h_id),
             "is_paid": True, 
             "status": "waiting",
-            "amount_paid": actual_fee,  # ✅ Now matches the hospital's price
-            "platform_fee": 1000        # Your fixed commission
+            "amount_paid": actual_fee,
+            "platform_fee": 1000 
         }).execute()
         print(f"✅ Supabase updated: {s_id} (Fee: {actual_fee}) is now LIVE.")
     except Exception as e:
         print(f"❌ Supabase Error: {e}")
 
-    # Notify doctors in the specific hospital lounge
+    # 🏥 The "Lounge" Broadcast
+    # We send the alert to the specific hospital lounge
     lounge_room = f"lounge_{str(h_id).lower()}"
     emit('new_patient_waiting', {
         'patient_name': p_name,
-        'session_id': s_id
+        'session_id': s_id,
+        'hospital_id': h_id
     }, room=lounge_room)
 
 @socketio.on('join')
@@ -163,7 +165,7 @@ def on_join(data):
     role = data.get('role')
     user = data.get('user')
 
-    # Security check for Doctors
+    # 1. Security check for Doctors entering a PRIVATE Consultation
     if room.startswith('cons-') and role == 'Doctor':
         res = supabase.table("consultations").select("*").eq("session_id", room).execute()
         if not res.data:
@@ -171,7 +173,13 @@ def on_join(data):
             emit('error', {'msg': '🛑 Session not found.'})
             return 
 
+    # 2. Add this Print so you can see what's happening in your terminal
+    print(f"👤 {user} ({role}) is joining room: {room}")
+
+    # 3. Actually join the room (This works for both 'cons-' and 'lounge_')
     join_room(room)
+    
+    # 4. Tell the room someone joined
     emit('receive_message', {'user': 'System', 'message': f'{user} has joined.'}, to=room)
 # --- Inside app.py ---
 @socketio.on('doctor_accepted_patient')
