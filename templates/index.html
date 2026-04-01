@@ -288,6 +288,9 @@ function testConsultation() {
     // 1. Grab the dynamic fee we stored in the option attribute
     const hospitalFee = selectedOption.getAttribute('data-fee') || "5,000";
     const hospName = selectedOption.text.split(' (')[0];
+    // 🟢 2. CLEAN THE FEE HERE (The Fix!)
+    // This turns "5,000" or "5000 UGX" into just "5000"
+    const cleanFee = rawFee.replace(/[^0-9]/g, '');
 
     // 2. Show the specific hospital's fee in the prompt
     let phone = prompt(`🏥 Hospital: ${hospName}\n💰 Fee: ${hospitalFee} UGX\n\nEnter 10-digit Number:`);
@@ -300,12 +303,13 @@ function testConsultation() {
 
     // 3. SEND EVERYTHING TO PYTHON (Including the fee!)
     socket.emit('patient_paid_and_waiting', { 
-        patient_name: name, 
-        hospital: hospCode,
-        phone: phone,
-        session_id: session_id,
-        fee: hospitalFee  // ✅ This is the key line!
-    });
+    patient_name: name, 
+    hospital_id: hospCode,    // Changed 'hospital' to 'hospital_id' to match SQL
+    phone: phone,
+    session_id: session_id,
+    amount_paid: hospitalFee, // Changed 'fee' to 'amount_paid' to match SQL
+    status: 'pending'         // Matches your default status
+});
 
     socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
     document.getElementById('login-overlay').style.display = 'none';
