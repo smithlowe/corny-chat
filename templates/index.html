@@ -71,7 +71,7 @@
             </select>
 
             <p style="font-size: 12px; color: gray; margin-bottom: 5px;">FOR PATIENTS ONLY</p>
-            <button onclick="startPatientFlow()" style="width: 100%; padding: 12px; background: orange; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">
+            <button onclick="testConsultation()" style="width: 100%; padding: 12px; background: orange; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">
     Pay & Request Consultation
 </button>
             
@@ -151,38 +151,34 @@
 
     // 3. HOSPITAL REFRESH LOGIC
     async function refreshHospitalList() {
-        console.log("🏥 Syncing hospitals from Supabase...");
+    const { data, error } = await _supabase
+        .from('hospitals')
+        .select('name, secret_code, consultation_fee'); // Match your SQL exactly
+
+    if (error) return console.error("❌ Supabase Error:", error.message);
+
+    const select = document.getElementById('hospSelect'); 
+    if (select && data) {
+        select.innerHTML = '<option value="">-- Select Hospital --</option>';
         
-        const { data, error } = await _supabase
-            .from('hospitals')
-            .select('name, secret_code, consultation_fee');
-
-        if (error) {
-            console.error("❌ Supabase Error:", error.message);
-            return;
-        }
-
-        const select = document.getElementById('hospSelect'); 
-        if (select && data) {
-            select.innerHTML = '<option value="">-- Select Hospital --</option>';
+        data.forEach(hospital => {
+            let opt = document.createElement('option');
+            opt.value = hospital.secret_code; 
             
-            data.forEach(hospital => {
-                let opt = document.createElement('option');
-                opt.value = hospital.secret_code; 
-                
-                // Store the dynamic fee
-                opt.setAttribute('data-fee', hospital.consultation_fee || "5,000");
+            // 💰 Ensure we grab the fee. Default to 5,000 if empty.
+            const fee = hospital.consultation_fee || "5,000";
+            opt.setAttribute('data-fee', fee);
 
-                // Check global window.active_doctors for the status
-                const count = (window.active_doctors) ? (window.active_doctors[hospital.secret_code] || 0) : 0;
-                const status = count > 0 ? `🟢 ${count} Online` : "🔴 Offline";
+            // 🟢 Check Online Status
+            const count = (window.active_doctors) ? (window.active_doctors[hospital.secret_code] || 0) : 0;
+            const status = count > 0 ? `🟢 ${count} Online` : "🔴 Offline";
 
-                opt.textContent = `${hospital.name} (${status})`; 
-                select.appendChild(opt);
-            });
-            console.log("✅ Dropdown synced with live data.");
-        }
+            // Update the text to show the FEE clearly
+            opt.textContent = `${hospital.name} - ${fee} UGX (${status})`; 
+            select.appendChild(opt);
+        });
     }
+}
 
     // 4. TRIGGER LOAD ON STARTUP
     document.addEventListener('DOMContentLoaded', refreshHospitalList);
@@ -278,43 +274,51 @@
     // --- UPDATE THIS SECTION ---
 function testConsultation() {
     const name = document.getElementById('username').value;
-    const selectElement = document.getElementById('hospSelect');
-    const hospCode = selectElement.value; 
-    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const select = document.getElementById('hospSelect');
     
+    // Safety checks
     if (!name) return alert("Please enter your name first!");
-    if (!hospCode) return alert("Please select a hospital from the list!");
+    if (!select.value || select.selectedIndex === -1) return alert("Please select a hospital!");
 
-    // 1. Grab the dynamic fee we stored in the option attribute
-    const hospitalFee = selectedOption.getAttribute('data-fee') || "5,000";
-    const hospName = selectedOption.text.split(' (')[0];
-    // 🟢 2. CLEAN THE FEE HERE (The Fix!)
-    // This turns "5,000" or "5000 UGX" into just "5000"
-    const cleanFee = rawFee.replace(/[^0-9]/g, '');
+    const selectedOption = select.options[select.selectedIndex];
+    const hospCode = select.value;
+    const hospName = selectedOption.text.split(' -')[0];
 
-    // 2. Show the specific hospital's fee in the prompt
-    let phone = prompt(`🏥 Hospital: ${hospName}\n💰 Fee: ${hospitalFee} UGX\n\nEnter 10-digit Number:`);
+    // 💰 1. Get the fee and clean it for the database (BIGINT safe)
+    const rawFee = selectedOption.getAttribute('data-fee') || "5,000"; 
+    const cleanFee = rawFee.replace(/[^0-9]/g, ''); 
+
+    // 📱 2. Payment Prompt
+    let phone = prompt(`🏥 Hospital: ${hospName}\n💰 Fee: ${rawFee} UGX\n\nEnter 10-digit Number (MTN/Airtel):`);
     
-    if (!phone || !/^\d{10}$/.test(phone)) return alert("❌ Invalid number!");
+    // Check for valid Ugandan 10-digit number
+    if (!phone || !/^\d{10}$/.test(phone)) {
+        return alert("❌ Invalid 10-digit phone number!");
+    }
 
     const session_id = "cons-" + Math.random().toString(36).substr(2, 9);
+    
+    // Set global variables for the chat
     myUser = name;
     myRoom = session_id;
 
-    // 3. SEND EVERYTHING TO PYTHON (Including the fee!)
+    // 📡 3. SEND EVERYTHING TO PYTHON & SUPABASE
     socket.emit('patient_paid_and_waiting', { 
-    patient_name: name, 
-    hospital_id: hospCode,    // Changed 'hospital' to 'hospital_id' to match SQL
-    phone: phone,
-    session_id: session_id,
-    amount_paid: hospitalFee, // Changed 'fee' to 'amount_paid' to match SQL
-    status: 'pending'         // Matches your default status
-});
+        patient_name: name, 
+        hospital_id: hospCode,
+        phone: phone,
+        session_id: session_id,
+        amount_paid: parseInt(cleanFee), // Sends as a number for your SQL BIGINT
+        status: 'pending'
+    });
 
+    // 4. Join the specific chat room
     socket.emit('join', { hospital: session_id, user: name, role: 'Patient' });
-    document.getElementById('login-overlay').style.display = 'none';
     
-    // Create the waiting screen
+    // 5. Hide the login overlay
+    document.getElementById('login-overlay').style.display = 'none';
+
+    // 6. Create the waiting screen UI
     const waitingArea = document.createElement('div');
     waitingArea.id = "patient-waiting-screen";
     waitingArea.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:3000;";
@@ -323,7 +327,7 @@ function testConsultation() {
             <h2 style="color: orange;">⏳ Notifying Doctors...</h2>
             <p>Hello <strong>${name}</strong>, looking for a doctor at <strong>${hospName}</strong>.</p>
             <div class="loader-spinner" style="margin: 20px auto; border: 4px solid #f3f3f3; border-top: 4px solid orange; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite;"></div>
-            <p style="color: #666;">Please stay on this screen.</p>
+            <p style="color: #666;">Please stay on this screen. A doctor will join shortly.</p>
         </div>
         <style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
     `;
