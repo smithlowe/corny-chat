@@ -124,40 +124,64 @@
 
     <input type="file" id="fIn" style="display:none" onchange="uploadFile()">
 
+
 <script>
-    // 1. HOSPITAL REFRESH LOGIC
-    // --- UPDATE THIS SECTION ---
-async function refreshHospitalList() {
-    const { data, error } = await supabase
-        .from('hospitals')
-        .select('name, secret_code, consultation_fee'); // Added consultation_fee
+    // 0. SUPABASE INITIALIZATION
+    const supabaseUrl = 'https://xyzxvsnhhlyuhcnmioui.supabase.co'; 
+    const supabaseKey = 'sb_publishable_ccnj1RxdPfK3Rhqw199XtA_V86c1V01';
+    
+    // Use '_supabase' to avoid conflict with the library name
+    const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-    if (error) {
-        console.error("Error loading hospitals:", error);
-        return;
-    }
-
-    const select = document.getElementById('hospSelect'); 
-    if (select) {
-        select.innerHTML = '<option value="">-- Select Hospital --</option>';
-        data.forEach(hospital => {
-            let opt = document.createElement('option');
-            opt.value = hospital.secret_code; 
-            // Store the fee in a custom attribute so we can grab it later
-            opt.setAttribute('data-fee', hospital.consultation_fee || "5,000");
-            opt.textContent = `${hospital.name} (Offline)`; 
-            opt.style.color = "#6c757d"; 
-            select.appendChild(opt);
-        });
-    }
-}
-
-    // TRIGGER LOAD
-    document.addEventListener('DOMContentLoaded', refreshHospitalList);
-
-    // 2. SOCKET INITIALIZATION
-    let socket = io(), myUser = "", myRoom = "";
+    // 1. SOCKET INITIALIZATION (Crucial: Define 'socket' first!)
+    let socket = io(); 
+    let myUser = "", myRoom = "";
     let mediaRecorder, audioChunks = [], timerInterval, seconds = 0;
+
+    // 2. DOCTOR COUNT LISTENER
+    socket.on('update_doctor_counts', (counts) => {
+        console.log("📊 Doctor counts received:", counts);
+        window.active_doctors = counts; // Store globally for the function to see
+        refreshHospitalList();          // Immediately redraw the list
+    });
+
+    // 3. HOSPITAL REFRESH LOGIC
+    async function refreshHospitalList() {
+        console.log("🏥 Syncing hospitals from Supabase...");
+        
+        const { data, error } = await _supabase
+            .from('hospitals')
+            .select('name, secret_code, consultation_fee');
+
+        if (error) {
+            console.error("❌ Supabase Error:", error.message);
+            return;
+        }
+
+        const select = document.getElementById('hospSelect'); 
+        if (select && data) {
+            select.innerHTML = '<option value="">-- Select Hospital --</option>';
+            
+            data.forEach(hospital => {
+                let opt = document.createElement('option');
+                opt.value = hospital.secret_code; 
+                
+                // Store the dynamic fee
+                opt.setAttribute('data-fee', hospital.consultation_fee || "5,000");
+
+                // Check global window.active_doctors for the status
+                const count = (window.active_doctors) ? (window.active_doctors[hospital.secret_code] || 0) : 0;
+                const status = count > 0 ? `🟢 ${count} Online` : "🔴 Offline";
+
+                opt.textContent = `${hospital.name} (${status})`; 
+                select.appendChild(opt);
+            });
+            console.log("✅ Dropdown synced with live data.");
+        }
+    }
+
+    // 4. TRIGGER LOAD ON STARTUP
+    document.addEventListener('DOMContentLoaded', refreshHospitalList);
 
     // 3. RECONNECT LOGIC
     socket.on('connect', () => {
