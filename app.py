@@ -1,8 +1,7 @@
 import os
 import uuid
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit, join_room
-from flask import session
+from flask import Flask, render_template, request, jsonify, session
+from flask_socketio import SocketIO, emit, join_room, leave_room # 👈 Added leave_room
 from supabase import create_client, Client
 
 app = Flask(__name__)
@@ -186,16 +185,28 @@ def on_join(data):
 def handle_acceptance(data):
     session_id = data.get('session_id')
     hosp = data.get('hospital', 'unknown')
+    doc_name = data.get('doctor_name', 'Doctor')
     lounge_room = f"lounge_{str(hosp).lower()}"
 
-    # 1. Update Supabase status to 'active' or 'taken'
-    supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
+    # 1. Update Supabase so no other doctor can take this session
+    try:
+        supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
+    except Exception as e:
+        print(f"❌ Supabase Update Error: {e}")
 
-    # 2. Tell the Patient they are matched (Same as before)
-    emit('match_found', {'session_id': session_id, 'doctor': data.get('doctor_name')}, room=session_id)
+    # 2. THE MOVE: Doctor leaves the general lounge and joins the private chat
+    leave_room(lounge_room) # 🚪 Stop hearing other patient alerts
+    join_room(session_id)   # 🤝 Join the private session with the patient
+    print(f"👨‍⚕️ {doc_name} joined private session: {session_id}")
 
-    # 3. THE FIX: Tell all other doctors in the lounge to remove this patient
-    # 'include_self=False' ensures the current doctor's UI doesn't break
+    # 3. Tell the Patient their doctor has arrived
+    emit('match_found', {
+        'session_id': session_id, 
+        'doctor': doc_name
+    }, room=session_id)
+
+    # 4. Cleanup the Lounge: Tell OTHER doctors to remove this patient from their list
+    # 'include_self=False' is key so the current doctor's UI stays clean
     emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
 # ... all your other routes and imports above ...
 

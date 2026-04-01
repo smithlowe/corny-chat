@@ -243,9 +243,21 @@
     });
 
     socket.on('remove_patient_from_list', function(data) {
-        const allInstances = document.querySelectorAll('.req-' + data.session_id);
-        allInstances.forEach(el => el.remove());
-    });
+    // 1. Remove all instances of this specific patient
+    const allInstances = document.querySelectorAll('.req-' + data.session_id);
+    allInstances.forEach(el => el.remove());
+
+    // 2. CHECK: Is the list now empty?
+    const list = document.getElementById('waiting-list');
+    
+    // We check if there are any <div> elements left inside the list
+    if (list && list.querySelectorAll('div').length === 0) {
+        list.innerHTML = `
+            <p id="no-patients" style="color: #999; text-align: center; padding: 20px;">
+                No patients waiting at the moment...
+            </p>`;
+    }
+});
 
     // 5. LIVE DOCTOR COUNTS
     socket.on('update_doctor_counts', (counts) => {
