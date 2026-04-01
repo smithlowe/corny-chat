@@ -2,6 +2,7 @@ import os
 import uuid
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
+from flask import session
 from supabase import create_client, Client
 
 app = Flask(__name__)
@@ -42,28 +43,14 @@ def verify():
 
 @socketio.on('request_consultation')
 def handle_request(data):
-    patient = data.get('user')
-    hospital = data.get('hospital_id')
-    lat = data.get('lat')
-    lon = data.get('lon')
-    
-    session_id = f"cons-{uuid.uuid4().hex[:8]}" 
-    
-    # 💰 Record the 5,000 UGX fee and your 1,000 UGX commission
-    supabase.table("consultations").insert({
-        "session_id": session_id,
-        "patient_name": patient,
-        "hospital_id": hospital,
-        "amount_paid": 5000,
-        "platform_fee": 1000, 
-        "is_paid": False, # 🔒 Locked
-        "patient_lat": lat,
-        "patient_lon": lon
-    }).execute()
-    
+    # ...
+    # Fetch the fee from the hospitals table first
+    res = supabase.table("hospitals").select("consultation_fee").eq("secret_code", hospital).single().execute()
+    hosp_fee = res.data.get('consultation_fee', 5000) if res.data else 5000
+
     emit('payment_prompt', {
         'session_id': session_id,
-        'fee': 5000,
+        'fee': hosp_fee, # ✅ Matches Supabase
         'hospital': hospital
     })
 @socketio.on('test_payment_success')
@@ -90,23 +77,63 @@ def handle_payment_master(data):
         }, room=hospital_lounge)
         
         print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
+active_doctors = {} # Put this at the very top of app.py
+
 @socketio.on('join_lounge')
-def handle_doctor_lounge(data):
-    doctor = data.get('doctor')
-    hosp = str(data.get('hospital', '')).lower() 
+def handle_lounge_join(data):
+    # 1. Get the code from the doctor
+    hosp_code = data.get('hospital') # Matches your frontend hospSelect.value
+    doc_name = data.get('doctor')
+
+    # 2. SECURITY CHECK: Verify this code exists in Supabase
+    result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
     
-    if hosp:
-        lounge_room = f"lounge_{hosp}"
-        join_room(lounge_room)
-        print(f"👨‍⚕️ {doctor} is now ONLINE and listening in: {lounge_room}")
+    if result.data:
+        # SUCCESS: Code is valid
+        hospital_name = result.data[0]['name']
+        join_room(hosp_code)
+
+        # 3. TRACKING: Store in session for the disconnect event
+        session['hosp_code'] = hosp_code
+        session['is_doctor'] = True
+
+        # 4. COUNTER: Increment the active doctor count
+        active_doctors[hosp_code] = active_doctors.get(hosp_code, 0) + 1
+        
+        # 5. RESPONSE: Tell the doctor they are in
+        emit('lounge_joined', {
+            'status': 'success', 
+            'hospital': hospital_name,
+            'doctor': doc_name
+        })
+
+        # 6. BROADCAST: Tell everyone (patients + doctors) the new counts
+        emit('update_doctor_counts', active_doctors, broadcast=True)
+        print(f"👨‍⚕️ {doc_name} joined {hospital_name}. Total online: {active_doctors[hosp_code]}")
+    
     else:
-        print("⚠️ Doctor tried to join lounge but no hospital was provided.")
+        # FAILURE: Code doesn't exist in your database
+        emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    hosp_code = session.get('hosp_code')
+    is_doc = session.get('is_doctor')
+
+    if is_doc and hosp_code in active_doctors:
+        active_doctors[hosp_code] = max(0, active_doctors[hosp_code] - 1)
+        emit('update_doctor_counts', active_doctors, broadcast=True)
+        print(f"📡 Connection lost. {hosp_code} doctor count: {active_doctors[hosp_code]}")
 
 @socketio.on('patient_paid_and_waiting')
 def handle_patient_waiting(data):
     p_name = data.get('patient_name')
     h_id = data.get('hospital', 'unknown')
     s_id = data.get('session_id')
+    
+    # 💰 NEW: Pull the specific fee sent from the frontend 
+    # If for some reason it's missing, it defaults to 5000
+    actual_fee = data.get('fee', 5000)
 
     try:
         # Match your SQL structure exactly
@@ -114,16 +141,16 @@ def handle_patient_waiting(data):
             "session_id": s_id,
             "patient_name": p_name,
             "hospital_id": h_id,
-            "is_paid": True, # Verification happens here
+            "is_paid": True, 
             "status": "waiting",
-            "amount_paid": 5000,
-            "platform_fee": 1000
+            "amount_paid": actual_fee,  # ✅ Now matches the hospital's price
+            "platform_fee": 1000        # Your fixed commission
         }).execute()
-        print(f"✅ Supabase updated: {s_id} is now LIVE in the DB.")
+        print(f"✅ Supabase updated: {s_id} (Fee: {actual_fee}) is now LIVE.")
     except Exception as e:
         print(f"❌ Supabase Error: {e}")
 
-    # Now notify doctors in the lounge
+    # Notify doctors in the specific hospital lounge
     lounge_room = f"lounge_{str(h_id).lower()}"
     emit('new_patient_waiting', {
         'patient_name': p_name,
