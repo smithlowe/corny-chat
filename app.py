@@ -56,27 +56,31 @@ def handle_request(data):
 def handle_payment_master(data):
     session_id = data.get('session_id')
     
-    # 1. UNLOCK: Update Supabase so the Doctor can eventually enter
+    # 1. UNLOCK: Update Supabase
     supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
     
-    # 2. GET DATA: Fetch the patient's name and hospital ID
-    res = supabase.table("consultations").select("*").eq("session_id", session_id).single().execute()
-    patient_data = res.data
+    # 2. GET DATA
+    res = supabase.table("consultations").select("*").eq("session_id", session_id).execute()
     
-    if patient_data:
-        # 3. ALERT PATIENT: Tell the patient's browser to show the "Waiting" screen
+    if res.data:
+        patient_data = res.data[0]
+        h_id = str(patient_data['hospital_id']).lower() # 🚨 FORCE LOWERCASE
+        hospital_lounge = f"lounge_{h_id}"
+
+        # 3. ALERT PATIENT
         emit('match_found', {'session_id': session_id}, room=request.sid)
 
-        # 4. PING DOCTORS: Notify all doctors in that specific hospital's lounge
-        hospital_lounge = f"lounge_{patient_data['hospital_id']}"
+        # 4. PING DOCTORS (The "Lounge" Alert)
         emit('new_patient_waiting', {
             'patient_name': patient_data['patient_name'],
             'session_id': session_id,
-            'hospital': patient_data['hospital_id']
+            'hospital': h_id
         }, room=hospital_lounge)
         
-        print(f"✅ Payment verified for {patient_data['patient_name']}. Doctors in {hospital_lounge} notified.")
-active_doctors = {} # Put this at the very top of app.py
+        print(f"✅ Payment verified for {patient_data['patient_name']}. Alert sent to {hospital_lounge}")
+
+# Keep this at the very top of your app.py as you said:
+active_doctors = {}
 
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
