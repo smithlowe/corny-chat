@@ -412,17 +412,24 @@ function logout() {
 
     function enterClinic() {
     const docName = document.getElementById('username').value;
-    const hosp = document.getElementById('hospSelect').value;
+    const hosp = document.getElementById('hospSelect').value; // This is "MUL101"
+    
     if (!docName) return alert("Please enter your name first");
 
     myUser = docName;
     myRole = 'Doctor';
-    myRoom = `lounge_${hosp.toLowerCase()}`;
+    
+    // 🚨 FIX: Match the Python room exactly (No "lounge_" prefix)
+    myRoom = hosp; 
 
-    // 💾 SAVE THE SESSION DATA
+    // 💾 SAVE DATA
     saveSession({ user: myUser, role: myRole, room: myRoom, hospCode: hosp });
 
-    socket.emit('join', { hospital: myRoom, user: myUser, role: myRole });
+    // 📡 Use 'join_lounge' since that's the Python listener you showed me
+    socket.emit('join_lounge', { 
+        hospital: myRoom, 
+        doctor: myUser 
+    });
     
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('doctor-dashboard').style.display = 'block';

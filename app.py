@@ -56,31 +56,23 @@ def handle_request(data):
 def handle_payment_master(data):
     session_id = data.get('session_id')
     
-    # 1. UNLOCK: Update Supabase
-    supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
-    
-    # 2. GET DATA
+    # ... Supabase update code ...
+
     res = supabase.table("consultations").select("*").eq("session_id", session_id).execute()
-    
     if res.data:
-        patient_data = res.data[0]
-        h_id = str(patient_data['hospital_id']).lower() # 🚨 FORCE LOWERCASE
-        hospital_lounge = f"lounge_{h_id}"
-
-        # 3. ALERT PATIENT
-        emit('match_found', {'session_id': session_id}, room=request.sid)
-
-        # 4. PING DOCTORS (The "Lounge" Alert)
-        emit('new_patient_waiting', {
-            'patient_name': patient_data['patient_name'],
-            'session_id': session_id,
-            'hospital': h_id
-        }, room=hospital_lounge)
+        p_data = res.data[0]
         
-        print(f"✅ Payment verified for {patient_data['patient_name']}. Alert sent to {hospital_lounge}")
+        # 🚨 THE FIX: Use the raw hosp_code (e.g., "MUL101") 
+        # matches the join_room(hosp_code) in your join_lounge function
+        hosp_room = p_data['hospital_id'] 
 
-# Keep this at the very top of your app.py as you said:
-active_doctors = {}
+        # 🏥 ALERT DOCTORS
+        emit('new_patient_waiting', {
+            'patient_name': p_data['patient_name'],
+            'session_id': session_id
+        }, room=hosp_room) # 👈 Send to "MUL101" instead of "lounge_mul101"
+        
+        print(f"📡 Broadcast sent to Hospital Room: {hosp_room}")
 
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
