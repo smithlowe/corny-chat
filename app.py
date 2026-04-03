@@ -1,22 +1,28 @@
+import gevent.monkey
+gevent.monkey.patch_all()  # 🚨 THIS MUST BE LINE 1 AND 2
+
 import os
 import uuid
 from flask import Flask, render_template, request, jsonify, session
-from flask_socketio import SocketIO, emit, join_room, leave_room # 👈 Added leave_room
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from supabase import create_client, Client
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'med_secure_2026'
+
+# 🏥 Global dictionary for tracking
 active_doctors = {}
 
-# Update your SocketIO line to this:
+# SocketIO Initialization
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
     async_mode='gevent',
-    ping_timeout=120,    # ⏳ Increased from 60 to 120
-    ping_interval=25,   # 💓 Heartbeat every 25 seconds
+    ping_timeout=120,
+    ping_interval=25,
     manage_session=True
 )
-# Supabase Setup (Remains exactly as you had it)
+
+# Supabase Setup
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
@@ -61,24 +67,26 @@ def handle_request(data):
 @socketio.on('test_payment_success')
 def handle_payment_master(data):
     session_id = data.get('session_id')
-    
-    # ... Supabase update code ...
+    print(f"💰 Payment success for session: {session_id}")
 
+    # 1. Update Supabase
+    supabase.table("consultations").update({"is_paid": True}).eq("session_id", session_id).execute()
+
+    # 2. Get the Hospital ID from the database
     res = supabase.table("consultations").select("*").eq("session_id", session_id).execute()
+    
     if res.data:
         p_data = res.data[0]
-        
-        # 🚨 THE FIX: Use the raw hosp_code (e.g., "MUL101") 
-        # matches the join_room(hosp_code) in your join_lounge function
-        hosp_room = p_data['hospital_id'] 
+        # 🚨 Use the exact ID the doctor uses (e.g., "MUL101")
+        hosp_room = p_data.get('hospital_id') 
 
-        # 🏥 ALERT DOCTORS
-        emit('new_patient_waiting', {
-            'patient_name': p_data['patient_name'],
-            'session_id': session_id
-        }, room=hosp_room) # 👈 Send to "MUL101" instead of "lounge_mul101"
-        
-        print(f"📡 Broadcast sent to Hospital Room: {hosp_room}")
+        if hosp_room:
+            # 🏥 Shout to the Doctor's room
+            emit('new_patient_waiting', {
+                'patient_name': p_data['patient_name'],
+                'session_id': session_id
+            }, room=hosp_room)
+            print(f"📡 Notification sent to Room: {hosp_room}")
 
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
