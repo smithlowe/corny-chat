@@ -82,21 +82,28 @@ def handle_payment_master(data):
 
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
-    hosp_code = data.get('hospital') # e.g., "MUL101"
+    hosp_code = data.get('hospital')
     doc_name = data.get('doctor')
+    
+    print(f"🔍 [DEBUG] Doctor '{doc_name}' trying code: '{hosp_code}'")
 
     # 1. Verify code in Supabase
-    result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
-    
+    try:
+        result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
+        print(f"📊 [DEBUG] Supabase result: {result.data}")
+    except Exception as e:
+        print(f"❌ [DEBUG] Supabase Error: {str(e)}")
+        return emit('lounge_joined', {'status': 'error', 'message': 'Database connection failed'})
+
     if result.data:
         hospital_name = result.data[0]['name']
-        join_room(hosp_code)
+        join_room(hosp_code) # 🚪 Doctor enters the room
         
-        # 2. Update tracking
+        # 2. Update tracking (Ensure active_doctors = {} is at top of app.py!)
         session['hosp_code'] = hosp_code
         active_doctors[hosp_code] = active_doctors.get(hosp_code, 0) + 1
         
-        # 3. SUCCESS RESPONSE (Crucial for the Frontend to transition)
+        # 3. SUCCESS RESPONSE
         emit('lounge_joined', {
             'status': 'success', 
             'hospital': hospital_name,
@@ -105,10 +112,10 @@ def handle_lounge_join(data):
 
         # 4. BROADCAST UPDATED COUNTS
         emit('update_doctor_counts', active_doctors, broadcast=True)
-        
-        print(f"👨‍⚕️ {doc_name} is now ONLINE in {hospital_name} ({hosp_code})")
+        print(f"✅ [SUCCESS] {doc_name} joined {hospital_name}")
+    
     else:
-        # FAILURE
+        print(f"❌ [FAILURE] No hospital found with code: {hosp_code}")
         emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
 
 @socketio.on('disconnect')
