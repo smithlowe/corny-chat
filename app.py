@@ -1,31 +1,33 @@
 import gevent.monkey
-gevent.monkey.patch_all()  # 🚨 THIS MUST BE LINE 1 AND 2
+gevent.monkey.patch_all()
 
 import os
-import uuid
-from flask import Flask, render_template, request, jsonify, session
-from flask_socketio import SocketIO, emit, join_room, leave_room
-from supabase import create_client, Client
+import uuid # 👈 Add if you use uuid.uuid4()
+from flask import Flask, render_template, request, session, jsonify # 👈 Essential for your routes
+from flask_socketio import SocketIO, emit, join_room, leave_room # 👈 Essential for your events
+from supabase import create_client
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'med_secure_2026'
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 
-# 🏥 Global dictionary for tracking
+# Global tracking
 active_doctors = {}
 
-# SocketIO Initialization
+# Initialize SocketIO
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
     async_mode='gevent',
     ping_timeout=120,
-    ping_interval=25,
-    manage_session=True
+    ping_interval=25
 )
 
-# Supabase Setup
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+# 🚨 THE FIX: Create a helper function for Supabase to avoid boot-up hangs
+def get_supabase():
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    return create_client(url, key)
+
+supabase = get_supabase()
 @app.route('/')
 def index():
     return render_template('index.html')
