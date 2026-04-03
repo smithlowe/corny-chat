@@ -172,26 +172,33 @@ def handle_patient_waiting(data):
 
 @socketio.on('join')
 def on_join(data):
-    room = data.get('hospital') 
-    role = data.get('role')
-    user = data.get('user')
+    try:
+        username = data.get('user')
+        room = data.get('room') # This is the 'cons-xxx' room
+        role = data.get('role', 'Patient')
 
-    # 1. Security check for Doctors entering a PRIVATE Consultation
-    if room.startswith('cons-') and role == 'Doctor':
-        res = supabase.table("consultations").select("*").eq("session_id", room).execute()
-        if not res.data:
-            print(f"⚠️ Access Denied: {room} not in DB.")
-            emit('error', {'msg': '🛑 Session not found.'})
-            return 
+        if not room:
+            print("⚠️ Join failed: No room provided")
+            return
 
-    # 2. Add this Print so you can see what's happening in your terminal
-    print(f"👤 {user} ({role}) is joining room: {room}")
+        # 1. Actually join the room
+        join_room(room)
+        print(f"👤 {username} ({role}) is joining room: {room}")
 
-    # 3. Actually join the room (This works for both 'cons-' and 'lounge_')
-    join_room(room)
-    
-    # 4. Tell the room someone joined
-    emit('receive_message', {'user': 'System', 'message': f'{user} has joined.'}, to=room)
+        # 2. 📢 TELL THE ROOM (Moved inside the try block)
+        emit('receive_message', {
+            'user': 'System', 
+            'message': f'{username} has joined.'
+        }, to=room)
+
+        # 3. Update Supabase if it's a patient
+        if role == 'Patient':
+            supabase.table("consultations").update({"status": "LIVE"}).eq("session_id", room).execute()
+            print(f"✅ Supabase updated: {room} is now LIVE.")
+
+    except Exception as e:
+        # 🚨 This catches errors so the server doesn't crash
+        print(f"❌ CRITICAL ERROR in on_join: {str(e)}")
 # --- Inside app.py ---
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
