@@ -76,38 +76,33 @@ def handle_payment_master(data):
 
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
-    # 1. Get the code from the doctor
-    hosp_code = data.get('hospital') # Matches your frontend hospSelect.value
+    hosp_code = data.get('hospital') # e.g., "MUL101"
     doc_name = data.get('doctor')
 
-    # 2. SECURITY CHECK: Verify this code exists in Supabase
+    # 1. Verify code in Supabase
     result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
     
     if result.data:
-        # SUCCESS: Code is valid
         hospital_name = result.data[0]['name']
         join_room(hosp_code)
-
-        # 3. TRACKING: Store in session for the disconnect event
+        
+        # 2. Update tracking
         session['hosp_code'] = hosp_code
-        session['is_doctor'] = True
-
-        # 4. COUNTER: Increment the active doctor count
         active_doctors[hosp_code] = active_doctors.get(hosp_code, 0) + 1
         
-        # 5. RESPONSE: Tell the doctor they are in
+        # 3. SUCCESS RESPONSE (Crucial for the Frontend to transition)
         emit('lounge_joined', {
             'status': 'success', 
             'hospital': hospital_name,
             'doctor': doc_name
         })
 
-        # 6. BROADCAST: Tell everyone (patients + doctors) the new counts
+        # 4. BROADCAST UPDATED COUNTS
         emit('update_doctor_counts', active_doctors, broadcast=True)
-        print(f"👨‍⚕️ {doc_name} joined {hospital_name}. Total online: {active_doctors[hosp_code]}")
-    
+        
+        print(f"👨‍⚕️ {doc_name} is now ONLINE in {hospital_name} ({hosp_code})")
     else:
-        # FAILURE: Code doesn't exist in your database
+        # FAILURE
         emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
 
 @socketio.on('disconnect')

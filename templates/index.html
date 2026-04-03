@@ -419,20 +419,22 @@ function logout() {
     myUser = docName;
     myRole = 'Doctor';
     
-    // 🚨 FIX: Match the Python room exactly (No "lounge_" prefix)
+    // 🚨 1. Match the Python Room Exactly (Raw ID)
     myRoom = hosp; 
 
-    // 💾 SAVE DATA
+    // 💾 2. Save Session
     saveSession({ user: myUser, role: myRole, room: myRoom, hospCode: hosp });
 
-    // 📡 Use 'join_lounge' since that's the Python listener you showed me
+    // 📡 3. CHANGE 'join' TO 'join_lounge' TO MATCH PYTHON
     socket.emit('join_lounge', { 
         hospital: myRoom, 
         doctor: myUser 
     });
     
+    // 🖼️ 4. UI Transitions
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('doctor-dashboard').style.display = 'block';
+    document.getElementById('display-doc-name').innerText = myUser;
 }
 
     socket.on('new_patient_waiting', (data) => {
