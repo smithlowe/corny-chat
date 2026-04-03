@@ -6,6 +6,7 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'med_secure_2026'
+active_doctors = {}
 
 # Update your SocketIO line to this:
 socketio = SocketIO(app, 
