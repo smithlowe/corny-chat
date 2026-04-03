@@ -7,9 +7,14 @@ from supabase import create_client, Client
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'med_secure_2026'
 
-# Fixed: Removed the double async_mode and set it to gevent
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
-
+# Update your SocketIO line to this:
+socketio = SocketIO(app, 
+    cors_allowed_origins="*", 
+    async_mode='gevent',
+    ping_timeout=120,    # ⏳ Increased from 60 to 120
+    ping_interval=25,   # 💓 Heartbeat every 25 seconds
+    manage_session=True
+)
 # Supabase Setup (Remains exactly as you had it)
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
