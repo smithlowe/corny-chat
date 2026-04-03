@@ -2,15 +2,15 @@ import gevent.monkey
 gevent.monkey.patch_all()
 
 import os
-import uuid # 👈 Add if you use uuid.uuid4()
-from flask import Flask, render_template, request, session, jsonify # 👈 Essential for your routes
-from flask_socketio import SocketIO, emit, join_room, leave_room # 👈 Essential for your events
+import uuid
+from flask import Flask, render_template, request, session, jsonify
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from supabase import create_client
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 
-# Global tracking
+# 🏥 Global tracking
 active_doctors = {}
 
 # Initialize SocketIO
@@ -21,24 +21,33 @@ socketio = SocketIO(app,
     ping_interval=25
 )
 
-# 🚨 THE FIX: Create a helper function for Supabase to avoid boot-up hangs
+# Supabase Helper
 def get_supabase():
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_KEY")
     return create_client(url, key)
 
 supabase = get_supabase()
+
+# --- 🌐 ALL ROUTES GO HERE (ABOVE START BLOCK) ---
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/health')
+def health_check():
+    return "OK", 200
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files: return jsonify({"success": False})
+    if 'file' not in request.files: 
+        return jsonify({"success": False, "error": "No file"})
     file = request.files['file']
     try:
         ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else "dat"
         unique_name = f"{uuid.uuid4()}.{ext}"
+        # Use the storage bucket 'medical-files'
         storage = supabase.storage.from_('medical-files')
         storage.upload(unique_name, file.read())
         return jsonify({"success": True, "url": storage.get_public_url(unique_name)})
@@ -48,10 +57,17 @@ def upload_file():
 @app.route('/verify-code', methods=['POST'])
 def verify():
     data = request.json
+    # 🏥 Your Hospital Access Codes
     passcodes = {"Mulago": "MUL-2026", "Nakasero": "NAK-555", "Mukono": "MUK-888"}
     if data.get('code') == passcodes.get(data.get('hospital')) or data.get('code') == "ADMIN-99":
         return jsonify({"success": True})
     return jsonify({"success": False})
+
+# --- 🚀 START SERVER BLOCK (ALWAYS AT THE VERY BOTTOM) ---
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host='0.0.0.0', port=port)
 
 
 @socketio.on('request_consultation')
