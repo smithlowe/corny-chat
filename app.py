@@ -211,10 +211,16 @@ def on_join(data):
 
         # 3. Update Supabase if it's a patient
         if role == 'Patient':
-            supabase.table("consultations").update({"status": "LIVE"}).eq("session_id", room).execute()
-            print(f"✅ Supabase updated: {room} is now LIVE.")
-
-    except Exception as e:
+            try:
+                # Update status to 'LIVE' (Matches your SQL Option 2 Fix)
+                supabase.table("consultations").update({"status": "LIVE"}).eq("session_id", room).execute()
+                print(f"✅ Supabase updated: {room} is now LIVE.")
+                
+                # 📢 NEW: Specifically alert the Doctor in the room to "Wake Up"
+                emit('status_update', {'status': 'LIVE', 'session_id': room}, to=room)
+                
+            except Exception as db_e:
+                print(f"⚠️ Database Error: {str(db_e)}")
         # 🚨 This catches errors so the server doesn't crash
         print(f"❌ CRITICAL ERROR in on_join: {str(e)}")
 # --- Inside app.py ---
