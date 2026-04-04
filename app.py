@@ -192,36 +192,30 @@ def handle_patient_waiting(data):
 def on_join(data):
     try:
         username = data.get('user')
-        room = data.get('room') # This is the 'cons-xxx' room
+        room = data.get('room')
         role = data.get('role', 'Patient')
 
         if not room:
-            print("⚠️ Join failed: No room provided")
             return
 
-        # 1. Actually join the room
         join_room(room)
         print(f"👤 {username} ({role}) is joining room: {room}")
 
-        # 2. 📢 TELL THE ROOM (Moved inside the try block)
         emit('receive_message', {
             'user': 'System', 
             'message': f'{username} has joined.'
         }, to=room)
 
-        # 3. Update Supabase if it's a patient
         if role == 'Patient':
             try:
-                # Update status to 'LIVE' (Matches your SQL Option 2 Fix)
+                # Syncing with your 'status' column in Supabase
                 supabase.table("consultations").update({"status": "LIVE"}).eq("session_id", room).execute()
                 print(f"✅ Supabase updated: {room} is now LIVE.")
-                
-                # 📢 NEW: Specifically alert the Doctor in the room to "Wake Up"
                 emit('status_update', {'status': 'LIVE', 'session_id': room}, to=room)
-                
             except Exception as db_e:
                 print(f"⚠️ Database Error: {str(db_e)}")
-        # 🚨 This catches errors so the server doesn't crash
+
+    except Exception as e:
         print(f"❌ CRITICAL ERROR in on_join: {str(e)}")
 # --- Inside app.py ---
 @socketio.on('doctor_accepted_patient')
