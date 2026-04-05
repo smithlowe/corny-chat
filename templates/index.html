@@ -220,6 +220,53 @@ socket.on('new_patient_waiting', function(data) {
     `;
     list.appendChild(item);
 });
+// --- MISSING HOSPITAL FETCHER START ---
+async function refreshHospitalList() {
+    console.log("🔍 Fetching hospitals from Supabase...");
+    
+    try {
+        const { data, error } = await _supabase
+            .from('hospitals')
+            .select('name, secret_code, consultation_fee');
+
+        if (error) {
+            console.error("❌ Supabase Error:", error.message);
+            return;
+        }
+
+        const select = document.getElementById('hospSelect');
+        if (!select) return;
+
+        // Clear the "Loading..." message
+        select.innerHTML = '<option value="">-- Select Hospital --</option>';
+
+        data.forEach(hospital => {
+            let opt = document.createElement('option');
+            opt.value = hospital.secret_code;
+            
+            // Set attributes so we can use them later for payment and display
+            const fee = hospital.consultation_fee || "5,000";
+            opt.setAttribute('data-fee', fee);
+            opt.setAttribute('data-name', hospital.name);
+
+            // Default text (will be updated by socket counts if doctors are online)
+            opt.textContent = `${hospital.name} - ${fee} UGX (Checking...)`;
+            select.appendChild(opt);
+        });
+
+        console.log("✅ Hospital list loaded.");
+        
+        // After loading the names, ask the server for the current online doctor counts
+        socket.emit('get_doctor_counts');
+
+    } catch (err) {
+        console.error("💥 Critical fetch error:", err);
+    }
+}
+
+// 🚩 CRITICAL: Run this function automatically when the page loads
+document.addEventListener('DOMContentLoaded', refreshHospitalList);
+// --- MISSING HOSPITAL FETCHER END ---
 
 // 2. The Acceptance Handshake
 function acceptPatient(sessionId) {
