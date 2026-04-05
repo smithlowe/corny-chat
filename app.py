@@ -224,30 +224,30 @@ def on_join(data):
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
-    hosp = data.get('hospital', 'unknown')
+    hosp = data.get('hospital', 'unknown') # e.g., 'MUL101'
     doc_name = data.get('doctor_name', 'Doctor')
-    lounge_room = f"lounge_{str(hosp).lower()}"
 
-    # 1. Update Supabase so no other doctor can take this session
+    # 1. Update Supabase
     try:
         supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
     except Exception as e:
         print(f"❌ Supabase Update Error: {e}")
 
-    # 2. THE MOVE: Doctor leaves the general lounge and joins the private chat
-    leave_room(lounge_room) # 🚪 Stop hearing other patient alerts
-    join_room(session_id)   # 🤝 Join the private session with the patient
+    # 2. THE MOVE: Standardize the room names
+    # Use 'hosp' directly (e.g., 'MUL101') to match handle_lounge_join
+    leave_room(hosp) 
+    join_room(session_id)
     print(f"👨‍⚕️ {doc_name} joined private session: {session_id}")
 
-    # 3. Tell the Patient their doctor has arrived
+    # 3. Tell the Patient to switch to Chat Mode
+    # Using 'to=' is more reliable in newer Flask-SocketIO versions
     emit('match_found', {
         'session_id': session_id, 
         'doctor': doc_name
-    }, room=session_id)
+    }, to=session_id)
 
-    # 4. Cleanup the Lounge: Tell OTHER doctors to remove this patient from their list
-    # 'include_self=False' is key so the current doctor's UI stays clean
-    emit('remove_patient_from_list', {'session_id': session_id}, room=lounge_room, include_self=False)
+    # 4. Cleanup: Tell OTHER doctors in the same hospital to remove this patient
+    emit('remove_patient_from_list', {'session_id': session_id}, to=hosp, include_self=False)
 # ... all your other routes and imports above ...
 
 @socketio.on('send_message')
