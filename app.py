@@ -220,7 +220,7 @@ def on_join(data):
                 print(f"⚠️ Database Error: {str(db_e)}")
 
     except Exception as e:
-        print(f"❌ CRITICAL ERROR in on_join: {str(e)}")e app.py ---
+        print(f"❌ CRITICAL ERROR in on_join: {str(e)}")
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
