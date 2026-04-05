@@ -363,7 +363,7 @@ function testConsultation() {
         status: 'pending'
     });
 
-    socket.emit('join', { hospital: myRoom, user: myUser, role: 'Patient' });
+    socket.emit('join', { room: myRoom, user: myUser, role: 'Patient' });
 
     document.getElementById('login-overlay').style.display = 'none';
     
