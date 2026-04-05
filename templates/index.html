@@ -179,7 +179,6 @@
     socket.on('connect', () => {
         console.log("📡 Connected to Server. ID:", socket.id);
         
-        // This checks if a Doctor was already logged in before a disconnect
         if (myUser && myRoom && myRole === 'Doctor') {
             console.log("🔄 Connection restored. Re-joining room:", myRoom);
             socket.emit('join_lounge', { 
@@ -189,63 +188,73 @@
         }
     });
 
-    // 4. DOCTOR COUNT LISTENER
-    socket.on('update_doctor_counts', (counts) => {
-        console.log("📊 Doctor counts received:", counts);
-        window.active_doctors = counts; 
-        refreshHospitalList(); 
+    // --- 👇 PASTE THE NEW NOTIFICATION LOGIC HERE 👇 ---
+
+    // 1. Listen for the Patient Notification
+socket.on('new_patient_waiting', function(data) {
+    console.log("🔔 New Patient Arrived:", data.patient_name);
+    
+    // Hide the "No patients" text if it exists
+    const noPatientsMsg = document.getElementById('no-patients');
+    if (noPatientsMsg) noPatientsMsg.style.display = 'none';
+
+    const list = document.getElementById('waiting-list');
+    
+    // Check if we already have this patient in the list (prevents duplicates)
+    if (document.getElementById(`card-${data.session_id}`)) return;
+
+    // Create the Patient Card to match your style
+    const item = document.createElement('div');
+    item.id = `card-${data.session_id}`;
+    item.style = "background: #f8f9fa; border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s ease;";
+    
+    item.innerHTML = `
+        <div>
+            <span style="font-weight: bold; color: #2c3e50; font-size: 16px;">👤 ${data.patient_name}</span><br>
+            <small style="color: #28a745; font-weight: bold;">Status: Waiting for Consult</small>
+        </div>
+        <button onclick="acceptPatient('${data.session_id}')" 
+                style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(40,167,69,0.3);">
+            Accept Patient
+        </button>
+    `;
+    list.appendChild(item);
+});
+
+// 2. The Acceptance Handshake
+function acceptPatient(sessionId) {
+    console.log("🚀 Accepting patient session:", sessionId);
+
+    // Tell the server this doctor is taking the case
+    // Note: myRoom is your Hospital Code (MUL101) and myUser is the Doctor Name
+    socket.emit('doctor_accepted_patient', {
+        session_id: sessionId,
+        hospital: myRoom, 
+        doctor_name: myUser
     });
 
-    // 5. HOSPITAL REFRESH LOGIC
-    async function refreshHospitalList() {
-        const { data, error } = await _supabase
-            .from('hospitals')
-            .select('name, secret_code, consultation_fee');
+    // Optional: Add a loading state to the button so the doctor doesn't click twice
+    const btn = event.target;
+    btn.innerText = "Connecting...";
+    btn.disabled = true;
+    btn.style.background = "#6c757d";
+}
 
-        if (error) return console.error("❌ Supabase Error:", error.message);
-
-        const select = document.getElementById('hospSelect'); 
-        if (select && data) {
-            select.innerHTML = '<option value="">-- Select Hospital --</option>';
-            
-            data.forEach(hospital => {
-                let opt = document.createElement('option');
-                opt.value = hospital.secret_code; 
-                
-                const fee = hospital.consultation_fee || "5,000";
-                opt.setAttribute('data-fee', fee);
-
-                const count = (window.active_doctors) ? (window.active_doctors[hospital.secret_code] || 0) : 0;
-                const status = count > 0 ? `🟢 ${count} Online` : "🔴 Offline";
-
-                opt.textContent = `${hospital.name} - ${fee} UGX (${status})`; 
-                select.appendChild(opt);
-            });
-        }
-    }
-
-    // 6. TRIGGER LOAD ON STARTUP
-    document.addEventListener('DOMContentLoaded', refreshHospitalList);
-
-    socket.on('disconnect', (reason) => {
-        console.warn("⚠️ Connection lost:", reason);
-    });
-
-    socket.on('connect_error', () => {
-        setTimeout(() => { socket.connect(); }, 3000);
-    });
-
-    // 4. MATCHING & UI LOGIC
-    socket.on('match_found', function(data) {
-        const waitingScreen = document.getElementById('patient-waiting-screen');
-        if (waitingScreen) waitingScreen.remove();
-
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'flex';
-        
-        myRoom = data.session_id;
-        alert("Dr. " + data.doctor + " is ready to assist you.");
-    });
+// 3. The Final Switch to Chat
+socket.on('match_found', function(data) {
+    console.log("✅ Match Found! Switching to Chat.");
+    
+    // Hide the Waiting Room and Login Overlay
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('doctor-dashboard').style.display = 'none';
+    
+    // Show the Chat Screen
+    const chatContainer = document.getElementById('chat-container');
+    chatContainer.style.display = 'flex';
+    
+    // Set the header name
+    document.getElementById('chat-with').innerText = data.doctor ? "Doctor: " + data.doctor : "Patient: Online";
+});
 
     socket.on('remove_patient_from_list', function(data) {
     // 1. Remove all instances of this specific patient
@@ -468,21 +477,27 @@ function logout() {
         }
     });
 
-    function acceptPatient(session_id) {
-    myRoom = session_id; // Set the chat room to the patient's session
-    
-    // 1. Join the private chat room
-    socket.emit('join', { hospital: session_id, user: myUser, role: 'Doctor' });
+    function acceptPatient(sessionId) {
+    console.log("🚀 Initiating handshake for session:", sessionId);
 
-    // 2. Hide Dashboard, Show Chat
-    document.getElementById('doctor-dashboard').style.display = 'none';
-    document.getElementById('chat-container').style.display = 'flex';
-    
-    // 3. Clear the waiting list UI if needed
-    const row = document.querySelector(`.req-${session_id}`);
-    if (row) row.remove();
-    
-    console.log("Joined patient chat:", session_id);
+    // 1. Tell the Server the Doctor is taking this specific patient
+    // This triggers the Python 'handle_acceptance' function
+    socket.emit('doctor_accepted_patient', {
+        session_id: sessionId,
+        hospital: myRoom, // This is your hospital code (e.g., 'MUL101')
+        doctor_name: myUser // Your name (e.g., 'Dr. Lawrence')
+    });
+
+    // 2. Provide instant UI feedback
+    const row = document.querySelector(`.req-${sessionId}`);
+    if (row) {
+        const btn = row.querySelector('button');
+        if (btn) {
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+            btn.style.background = "#6c757d";
+        }
+    }
 }
 
     function logout() {
