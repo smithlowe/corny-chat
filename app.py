@@ -179,16 +179,20 @@ def handle_patient_waiting(data):
     except Exception as e:
         print(f"❌ Supabase Error: {e}")
 
-    # 🏥 The "Lounge" Broadcast
-    # We send the alert to the specific hospital lounge
-    lounge_room = f"lounge_{str(h_id).lower()}"
+    # 🏥 The "Lounge" Broadcast - ALIGNED WITH DOCTOR JOIN
+    # Instead of f"lounge_{str(h_id).lower()}", use the raw ID
+    # because that's what handle_lounge_join uses: join_room(hosp_code)
+    
     emit('new_patient_waiting', {
         'patient_name': p_name,
         'session_id': s_id,
         'hospital_id': h_id
-    }, room=lounge_room)
+    }, to=h_id) # 👈 Just use h_id (e.g., 'MUL101')
+    
+    print(f"📢 Notification sent to room: {h_id}")
 
-@socketio.on('join')
+
+# --- Insid@socketio.on('join')
 def on_join(data):
     try:
         username = data.get('user')
@@ -216,8 +220,7 @@ def on_join(data):
                 print(f"⚠️ Database Error: {str(db_e)}")
 
     except Exception as e:
-        print(f"❌ CRITICAL ERROR in on_join: {str(e)}")
-# --- Inside app.py ---
+        print(f"❌ CRITICAL ERROR in on_join: {str(e)}")e app.py ---
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
     session_id = data.get('session_id')
