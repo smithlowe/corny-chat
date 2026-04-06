@@ -93,11 +93,22 @@
             <div>
                 <h2 style="color: #28a745; margin-top: 0;">👨‍⚕️ Hospital Waiting Room</h2>
                 <p>Welcome, <span id="display-doc-name" style="font-weight: bold; color: #2c3e50;"></span></p>
+                <p style="font-size: 0.9em; color: #7f8c8d;">Facility: <span id="hospital-name-display" style="font-weight: bold;"></span></p>
             </div>
+            
             <button onclick="logout()" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
                 Log Out
             </button>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <h4 style="color: #2c3e50;">Incoming Patients</h4>
+        <div id="waiting-list">
+            <p id="no-patients" style="color: #95a5a6; font-style: italic;">No patients currently waiting.</p>
+        </div>
+
+    </div>
+</div>
 
         <p style="color: #666; font-size: 14px;">Incoming patient requests for your hospital will appear below:</p>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
@@ -321,31 +332,39 @@ socket.on('match_found', function(data) {
 });
 
     // 5. LIVE DOCTOR COUNTS
-    socket.on('update_doctor_counts', (counts) => {
-    console.log("📊 Received doctor counts from server:", counts); // 🚨 CHECK CONSOLE FOR THIS
-    
+    socket.on('update_doctor_counts', (data) => {
+    console.log("📊 Doctor counts update received:", data);
+
+    // --- 1. UPDATE THE DOCTOR'S DASHBOARD STATUS ---
+    const countElement = document.getElementById('online-doctor-count');
+    if (countElement && data.count !== undefined) {
+        countElement.innerText = data.count + " Doctor(s) Online";
+        countElement.style.color = "#2ecc71"; 
+    }
+
+    // --- 2. UPDATE THE PATIENT'S HOSPITAL SELECT LIST ---
     const select = document.getElementById('hospSelect');
-    if (!select) return;
+    if (select && data.hospital_counts) { 
+        // Note: Make sure your backend sends 'hospital_counts'
+        for (let i = 0; i < select.options.length; i++) {
+            let opt = select.options[i];
+            let code = opt.value;
 
-    for (let i = 0; i < select.options.length; i++) {
-        let opt = select.options[i];
-        let code = opt.value; // e.g., "MUL101"
+            if (code && data.hospital_counts[code] !== undefined) {
+                let baseName = opt.getAttribute('data-name') || opt.textContent.split(' (')[0];
+                
+                if (!opt.getAttribute('data-name')) {
+                    opt.setAttribute('data-name', baseName);
+                }
 
-        if (code && counts[code] !== undefined) {
-            // Get the clean name (everything before the first '(')
-            let baseName = opt.getAttribute('data-name') || opt.textContent.split(' (')[0];
-            
-            // Save the clean name so we don't lose it on the next update
-            if (!opt.getAttribute('data-name')) {
-                opt.setAttribute('data-name', baseName);
-            }
-
-            if (counts[code] > 0) {
-                opt.textContent = `${baseName} (${counts[code]} Online)`;
-                opt.style.color = "#28a745"; // Green
-            } else {
-                opt.textContent = `${baseName} (Offline)`;
-                opt.style.color = "#6c757d"; // Gray
+                let numOnline = data.hospital_counts[code];
+                if (numOnline > 0) {
+                    opt.textContent = `${baseName} (${numOnline} Online)`;
+                    opt.style.color = "#28a745"; // Green
+                } else {
+                    opt.textContent = `${baseName} (Offline)`;
+                    opt.style.color = "#6c757d"; // Gray
+                }
             }
         }
     }
@@ -496,18 +515,24 @@ function logout() {
     saveSession({ user: myUser, role: myRole, room: myRoom, hospCode: hosp });
     // PASTE THIS INSIDE YOUR <script> TAG IN index.html
 socket.on('lounge_joined', (data) => {
+    console.log("📩 Received from server:", data); // This will show in F12 Console
+    
     if (data.status === 'success') {
-        // 1. Hide login, show dashboard
-        document.getElementById('doctor-login-section').style.display = 'none';
-        document.getElementById('doctor-dashboard').style.display = 'block';
-
-        // 2. Fill in the names
-        document.getElementById('display-doc-name').innerText = data.doctor;
-        document.getElementById('hospital-name-display').innerText = data.hospital;
+        alert("Success! Now trying to switch views...");
         
-        console.log("✅ Dashboard active for " + data.hospital);
+        const loginSection = document.getElementById('doctor-login-section');
+        const dashboard = document.getElementById('doctor-dashboard');
+
+        if (loginSection && dashboard) {
+            loginSection.style.display = 'none';
+            dashboard.style.display = 'block';
+            document.getElementById('display-doc-name').innerText = data.doctor;
+            document.getElementById('hospital-name-display').innerText = data.hospital;
+        } else {
+            console.error("❌ Error: Could not find doctor-login-section or doctor-dashboard IDs in HTML!");
+        }
     } else {
-        alert("Error: " + data.message);
+        alert("Server returned error: " + data.message);
     }
 });
 
