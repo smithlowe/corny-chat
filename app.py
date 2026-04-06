@@ -301,6 +301,8 @@ def handle_message(data):
     except Exception as e:
         print(f"⚠️ Database Log Error: {e}")
 
-# THIS MUST BE THE ABSOLUTE LAST TWO LINES
 if __name__ == '__main__':
-    socketio.run(app)
+    # Render assigns a dynamic port; we must capture it
+    port = int(os.environ.get("PORT", 10000))
+    # host='0.0.0.0' allows external traffic to reach the app
+    socketio.run(app, host='0.0.0.0', port=port)
