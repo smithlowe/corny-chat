@@ -15,15 +15,17 @@ app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 active_doctors = {}
 
 # Initialize SocketIO with all stability flags
+# Initialize SocketIO with all stability flags
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
     async_mode='gevent',
     ping_timeout=60,
     ping_interval=10,
     manage_session=True,
-    allow_upgrades=True,  # Keep this too! It helps slow connections upgrade to WebSockets
-    logger=True,          # Adds extra info to your Render logs
-    engineio_logger=True  # Helps us see exactly why a doctor might "disconnect"
+    allow_upgrades=True,
+    logger=True,
+    engineio_logger=True
+) # <--- THIS BRACKET WAS MISSING
 
 # Supabase Helper
 def get_supabase():
