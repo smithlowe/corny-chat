@@ -494,6 +494,22 @@ function logout() {
 
     // 💾 2. Save Session
     saveSession({ user: myUser, role: myRole, room: myRoom, hospCode: hosp });
+    // PASTE THIS INSIDE YOUR <script> TAG IN index.html
+socket.on('lounge_joined', (data) => {
+    if (data.status === 'success') {
+        // 1. Hide login, show dashboard
+        document.getElementById('doctor-login-section').style.display = 'none';
+        document.getElementById('doctor-dashboard').style.display = 'block';
+
+        // 2. Fill in the names
+        document.getElementById('display-doc-name').innerText = data.doctor;
+        document.getElementById('hospital-name-display').innerText = data.hospital;
+        
+        console.log("✅ Dashboard active for " + data.hospital);
+    } else {
+        alert("Error: " + data.message);
+    }
+});
 
     // 📡 3. CHANGE 'join' TO 'join_lounge' TO MATCH PYTHON
     socket.emit('join_lounge', { 

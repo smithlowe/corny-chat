@@ -115,6 +115,8 @@ def handle_payment_master(data):
             print(f"📡 Notification sent to Room: {hosp_room}")
 
 # --- 1. THE DOCTOR'S LOBBY (Keep the logic!) ---
+   except Exception as e:
+        print(f"❌ Supabase Error: {str(e)}")
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
     hosp_code = data.get('hospital')
@@ -123,43 +125,44 @@ def handle_lounge_join(data):
     print(f"🔍 [DEBUG] Doctor '{doc_name}' trying code: '{hosp_code}'")
 
     try:
-        # Check Supabase for valid code
+        # 1. Check Supabase for valid code
         result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
         
         if result.data:
             hospital_name = result.data[0]['name']
             
-            # 1. Join the physical room for notifications
+            # 2. Join the physical room for notifications
             join_room(hosp_code) 
             
-            # 2. Track the SPECIFIC connection (sid)
-            # This ensures if one doctor has 2 tabs open, they are both tracked
+            # 3. Track the SPECIFIC connection (sid)
             active_doctors[request.sid] = {
                 "name": doc_name,
                 "hospital": hosp_code
             }
             
-            # 3. Save to session for reliability
+            # 4. Save to session for reliability
             session['hosp_code'] = hosp_code
             session['is_doctor'] = True
             
-            # 4. Success Response
+            # 5. Send Success Response to the Doctor who joined
             emit('lounge_joined', {
                 'status': 'success', 
                 'hospital': hospital_name,
                 'doctor': doc_name
             })
             
-            # 5. Broadcast updated counts (calculate length of active_doctors)
+            # 6. Broadcast updated counts to EVERYONE
             emit('update_doctor_counts', {"count": len(active_doctors)}, broadcast=True)
             print(f"✅ {doc_name} is now monitoring {hospital_name}")
             
         else:
+            # Code was wrong
             emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
             
     except Exception as e:
-        print(f"❌ Supabase Error: {str(e)}")
-        emit('lounge_joined', {'status': 'error', 'message': 'Server Error'})
+        # Something went wrong with the Database or Server
+        print(f"❌ Supabase/Server Error: {str(e)}")
+        emit('lounge_joined', {'status': 'error', 'message': 'Server Error'})     
 
 # --- 2. THE PRIVATE CONSULTATION (The New Function) ---
 @socketio.on('join')
