@@ -14,14 +14,16 @@ app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 # 🏥 Global tracking
 active_doctors = {}
 
-# Initialize SocketIO with reinforced heartbeats
+# Initialize SocketIO with all stability flags
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
     async_mode='gevent',
     ping_timeout=60,
     ping_interval=10,
-    allow_upgrades=True
-)
+    manage_session=True,
+    allow_upgrades=True,  # Keep this too! It helps slow connections upgrade to WebSockets
+    logger=True,          # Adds extra info to your Render logs
+    engineio_logger=True  # Helps us see exactly why a doctor might "disconnect"
 
 # Supabase Helper
 def get_supabase():
@@ -114,29 +116,42 @@ def handle_payment_master(data):
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
     hosp_code = data.get('hospital')
-    doc_name = data.get('doctor')
+    doc_name = data.get('doctor', 'Unknown Doctor')
     
     print(f"🔍 [DEBUG] Doctor '{doc_name}' trying code: '{hosp_code}'")
 
     try:
-        # We MUST keep this check so only real doctors with codes get in
+        # Check Supabase for valid code
         result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
         
         if result.data:
             hospital_name = result.data[0]['name']
-            join_room(hosp_code) # Doctor enters the hospital "Hallway"
             
+            # 1. Join the physical room for notifications
+            join_room(hosp_code) 
+            
+            # 2. Track the SPECIFIC connection (sid)
+            # This ensures if one doctor has 2 tabs open, they are both tracked
+            active_doctors[request.sid] = {
+                "name": doc_name,
+                "hospital": hosp_code
+            }
+            
+            # 3. Save to session for reliability
             session['hosp_code'] = hosp_code
             session['is_doctor'] = True
-            active_doctors[hosp_code] = active_doctors.get(hosp_code, 0) + 1
             
+            # 4. Success Response
             emit('lounge_joined', {
                 'status': 'success', 
                 'hospital': hospital_name,
                 'doctor': doc_name
             })
-            emit('update_doctor_counts', active_doctors, broadcast=True)
+            
+            # 5. Broadcast updated counts (calculate length of active_doctors)
+            emit('update_doctor_counts', {"count": len(active_doctors)}, broadcast=True)
             print(f"✅ {doc_name} is now monitoring {hospital_name}")
+            
         else:
             emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
             

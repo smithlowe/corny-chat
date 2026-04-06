@@ -162,13 +162,13 @@
     const supabaseKey = 'sb_publishable_ccnj1RxdPfK3Rhqw199XtA_V86c1V01';
     const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-    // 1. GLOBAL VARIABLES (Declared once, at the top)
+    // 1. GLOBAL VARIABLES
     let myUser = ""; 
     let myRoom = ""; 
-    let myRole = ""; // 👈 Added this to fix the red error
+    let myRole = ""; 
     let mediaRecorder, audioChunks = [], timerInterval, seconds = 0;
 
-    // 2. STABLE SOCKET INITIALIZATION (Defined once)
+    // 2. STABLE SOCKET INITIALIZATION (Only define 'socket' ONCE here)
     const socket = io({
         transports: ['websocket', 'polling'],
         reconnection: true,
