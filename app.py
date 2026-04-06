@@ -106,6 +106,7 @@ def handle_payment_master(data):
             }, room=hosp_room)
             print(f"📡 Notification sent to Room: {hosp_room}")
 
+# --- 1. THE DOCTOR'S LOBBY (Keep the logic!) ---
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
     hosp_code = data.get('hospital')
@@ -113,36 +114,56 @@ def handle_lounge_join(data):
     
     print(f"🔍 [DEBUG] Doctor '{doc_name}' trying code: '{hosp_code}'")
 
-    # 1. Verify code in Supabase
     try:
+        # We MUST keep this check so only real doctors with codes get in
         result = supabase.table('hospitals').select('*').eq('secret_code', hosp_code).execute()
-        print(f"📊 [DEBUG] Supabase result: {result.data}")
+        
+        if result.data:
+            hospital_name = result.data[0]['name']
+            join_room(hosp_code) # Doctor enters the hospital "Hallway"
+            
+            session['hosp_code'] = hosp_code
+            session['is_doctor'] = True
+            active_doctors[hosp_code] = active_doctors.get(hosp_code, 0) + 1
+            
+            emit('lounge_joined', {
+                'status': 'success', 
+                'hospital': hospital_name,
+                'doctor': doc_name
+            })
+            emit('update_doctor_counts', active_doctors, broadcast=True)
+            print(f"✅ {doc_name} is now monitoring {hospital_name}")
+        else:
+            emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
+            
     except Exception as e:
-        print(f"❌ [DEBUG] Supabase Error: {str(e)}")
-        return emit('lounge_joined', {'status': 'error', 'message': 'Database connection failed'})
+        print(f"❌ Supabase Error: {str(e)}")
+        emit('lounge_joined', {'status': 'error', 'message': 'Server Error'})
 
-    if result.data:
-        hospital_name = result.data[0]['name']
-        join_room(hosp_code) # 🚪 Doctor enters the room
-        
-        # 2. Update tracking (Ensure active_doctors = {} is at top of app.py!)
-        session['hosp_code'] = hosp_code
-        active_doctors[hosp_code] = active_doctors.get(hosp_code, 0) + 1
-        
-        # 3. SUCCESS RESPONSE
-        emit('lounge_joined', {
-            'status': 'success', 
-            'hospital': hospital_name,
-            'doctor': doc_name
-        })
+# --- 2. THE PRIVATE CONSULTATION (The New Function) ---
+@socketio.on('join')
+def on_join(data):
+    try:
+        username = data.get('user')
+        room = data.get('room') # This is the 'cons-xxxx' ID
+        role = data.get('role', 'Patient')
 
-        # 4. BROADCAST UPDATED COUNTS
-        emit('update_doctor_counts', active_doctors, broadcast=True)
-        print(f"✅ [SUCCESS] {doc_name} joined {hospital_name}")
-    
-    else:
-        print(f"❌ [FAILURE] No hospital found with code: {hosp_code}")
-        emit('lounge_joined', {'status': 'error', 'message': 'Invalid Access Code'})
+        if not room: return
+
+        join_room(room) # Both Doctor and Patient enter this private room
+        print(f"👤 {username} ({role}) locked into room: {room}")
+
+        # If a patient joins, let's make sure their status is 'active'
+        if role == 'Patient':
+             supabase.table("consultations").update({"status": "active"}).eq("session_id", room).execute()
+
+        emit('receive_message', {
+            'user': 'System', 
+            'message': f'{username} has joined the consultation.'
+        }, to=room)
+
+    except Exception as e:
+        print(f"❌ Error in on_join: {str(e)}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -252,18 +273,19 @@ def handle_acceptance(data):
 
 @socketio.on('send_message')
 def handle_message(data):
-    hosp = data.get('hospital')
-    if not hosp:
+    # CRITICAL: Use session_id to ensure private chat, not the hospital room
+    room = data.get('session_id') 
+    if not room:
         return
     
-    # Broadcast to everyone in the hospital room
-    emit('receive_message', data, to=hosp)
+    # Broadcast ONLY to the private session room
+    emit('receive_message', data, to=room)
 
     try:
         supabase.table("messages").insert({
+            "session_id": room, # Match this to your Supabase column
             "sender": data.get('user', 'Unknown'), 
             "content": data.get('message', ''), 
-            "hospital": hosp, 
             "doctor_name": data.get('doctor_name', '')
         }).execute()
     except Exception as e:
