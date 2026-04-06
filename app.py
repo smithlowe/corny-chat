@@ -114,9 +114,7 @@ def handle_payment_master(data):
             }, room=hosp_room)
             print(f"📡 Notification sent to Room: {hosp_room}")
 
-# --- 1. THE DOCTOR'S LOBBY (Keep the logic!) ---
-   except Exception as e:
-        print(f"❌ Supabase Error: {str(e)}")
+# --- 1. THE DOCTOR'S LOBBY ---
 @socketio.on('join_lounge')
 def handle_lounge_join(data):
     hosp_code = data.get('hospital')
@@ -162,7 +160,7 @@ def handle_lounge_join(data):
     except Exception as e:
         # Something went wrong with the Database or Server
         print(f"❌ Supabase/Server Error: {str(e)}")
-        emit('lounge_joined', {'status': 'error', 'message': 'Server Error'})     
+        emit('lounge_joined', {'status': 'error', 'message': 'Server Error'})
 
 # --- 2. THE PRIVATE CONSULTATION (The New Function) ---
 @socketio.on('join')
