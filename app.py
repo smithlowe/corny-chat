@@ -1,6 +1,7 @@
 import gevent.monkey
-gevent.monkey.patch_all(dns=True, socket=True, thread=True) # Full async compatibility
+gevent.monkey.patch_all(dns=True, socket=True, thread=True) 
 
+import gevent  # <--- ADD THIS: Needed for gevent.sleep and gevent.spawn
 import os
 import uuid
 from flask import Flask, render_template, request, session, jsonify
@@ -13,24 +14,21 @@ app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 # 🏥 Global tracking
 active_doctors = {}
 
-# Initialize SocketIO with reinforced heartbeats for Render
+# Initialize SocketIO with reinforced heartbeats
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
     async_mode='gevent',
-    ping_timeout=60,      # Faster timeout detection
-    ping_interval=10,     # Frequent pings to keep the Render connection alive
+    ping_timeout=60,
+    ping_interval=10,
     allow_upgrades=True
 )
 
-# Supabase Helper - Moved inside a function to prevent early connection "freezing"
+# Supabase Helper
 def get_supabase():
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_KEY")
-    if not url or not key:
-        print("❌ CRITICAL: Supabase Environment Variables Missing!")
     return create_client(url, key)
 
-# Initialize client ONLY after gevent is fully ready
 supabase = get_supabase()
 
 # --- 🌐 ALL ROUTES GO HERE ---
@@ -250,30 +248,36 @@ def on_join(data):
         print(f"❌ CRITICAL ERROR in on_join: {str(e)}")
 @socketio.on('doctor_accepted_patient')
 def handle_acceptance(data):
+    # 1. The Breather
+    gevent.sleep(0.1) 
+    
     session_id = data.get('session_id')
-    hosp = data.get('hospital', 'unknown') # e.g., 'MUL101'
+    hosp = data.get('hospital')
     doc_name = data.get('doctor_name', 'Doctor')
 
-    # 1. Update Supabase
-    try:
-        supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
-    except Exception as e:
-        print(f"❌ Supabase Update Error: {e}")
+    # 2. THE "SIDEWAYS" UPDATE (Paste it here)
+    def update_db():
+        try:
+            # This runs in the background
+            supabase.table("consultations").update({"status": "active"}).eq("session_id", session_id).execute()
+            print(f"✅ [DB BACKGROUND] Session {session_id} set to active.")
+        except Exception as e:
+            print(f"❌ [DB BACKGROUND ERROR]: {e}")
 
-    # 2. THE MOVE: Standardize the room names
-    # Use 'hosp' directly (e.g., 'MUL101') to match handle_lounge_join
-    leave_room(hosp) 
+    gevent.spawn(update_db) # This triggers the background task instantly
+
+    # 3. Join the doctor to the private room
     join_room(session_id)
     print(f"👨‍⚕️ {doc_name} joined private session: {session_id}")
 
-    # 3. Tell the Patient to switch to Chat Mode
-    # Using 'to=' is more reliable in newer Flask-SocketIO versions
+    # 4. Notify BOTH the patient and doctor that they are matched
+    # This happens immediately because we didn't wait for the DB!
     emit('match_found', {
-        'session_id': session_id, 
-        'doctor': doc_name
+        'session_id': session_id,
+        'doctor_name': doc_name,
+        'status': 'connected'
     }, to=session_id)
-
-    # 4. Cleanup: Tell OTHER doctors in the same hospital to remove this patient
+    # 5. Cleanup: Tell other doctors in the hospital that this patient is taken
     emit('remove_patient_from_list', {'session_id': session_id}, to=hosp, include_self=False)
 # ... all your other routes and imports above ...
 
