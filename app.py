@@ -13,10 +13,10 @@ app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 # 🏥 Global tracking
 active_doctors = {}
 
-# Initialize SocketIO
+# Initialize SocketIO with explicit gevent mode
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
-    async_mode='gevent',
+    async_mode='gevent',  # <--- VERY IMPORTANT FOR RENDER
     ping_timeout=120,
     ping_interval=25
 )
