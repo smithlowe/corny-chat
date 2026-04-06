@@ -1,5 +1,5 @@
 import gevent.monkey
-gevent.monkey.patch_all()
+gevent.monkey.patch_all(dns=True, socket=True, thread=True) # Full async compatibility
 
 import os
 import uuid
@@ -13,21 +13,27 @@ app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "med_secure_2026")
 # 🏥 Global tracking
 active_doctors = {}
 
-# Initialize SocketIO with explicit gevent mode
+# Initialize SocketIO with reinforced heartbeats for Render
 socketio = SocketIO(app, 
     cors_allowed_origins="*", 
-    async_mode='gevent',  # <--- VERY IMPORTANT FOR RENDER
-    ping_timeout=120,
-    ping_interval=25
+    async_mode='gevent',
+    ping_timeout=60,      # Faster timeout detection
+    ping_interval=10,     # Frequent pings to keep the Render connection alive
+    allow_upgrades=True
 )
 
-# Supabase Helper
+# Supabase Helper - Moved inside a function to prevent early connection "freezing"
 def get_supabase():
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        print("❌ CRITICAL: Supabase Environment Variables Missing!")
     return create_client(url, key)
 
+# Initialize client ONLY after gevent is fully ready
 supabase = get_supabase()
+
+# --- 🌐 ALL ROUTES GO HERE ---
 
 # --- 🌐 ALL ROUTES GO HERE (ABOVE START BLOCK) ---
 
