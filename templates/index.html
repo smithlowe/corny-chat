@@ -147,11 +147,28 @@
     }
 
     function acceptPatient(sessionId) {
-        socket.emit('doctor_accepted_patient', { session_id: sessionId, hospital: myRoom, doctor_name: myUser });
-        const btn = event.target;
+    // 1. Capture the hospital code (currently stored in myRoom) 
+    // before we overwrite it.
+    const hospitalCode = myRoom; 
+
+    // 2. CRITICAL: Switch the doctor's room to the patient's ID
+    // This allows the doctor's messages to go to the patient.
+    myRoom = sessionId; 
+
+    // 3. Emit the event
+    socket.emit('doctor_accepted_patient', { 
+        session_id: sessionId, 
+        hospital: hospitalCode, 
+        doctor_name: myUser 
+    });
+
+    // 4. UI Feedback
+    const btn = event.target;
+    if (btn) {
         btn.innerText = "Connecting...";
         btn.disabled = true;
     }
+}
 
     // --- PATIENT LOGIC ---
     function testConsultation() {
@@ -199,13 +216,17 @@
     });
 
     socket.on('match_found', (data) => {
-        const waitScreen = document.getElementById('patient-waiting-screen');
-        if (waitScreen) waitScreen.remove();
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('doctor-dashboard').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'flex';
-        document.getElementById('chat-with').innerText = data.doctor_name || "Patient Online";
-    });
+    // Both parties must be on the same room ID
+    myRoom = data.session_id; 
+    
+    const waitScreen = document.getElementById('patient-waiting-screen');
+    if (waitScreen) waitScreen.remove();
+    
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('doctor-dashboard').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+    document.getElementById('chat-with').innerText = data.doctor_name || "Doctor Online";
+});
 
     socket.on('receive_message', (data) => {
         const container = document.getElementById('messages');
